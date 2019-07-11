@@ -64,7 +64,7 @@ p.stdout.on('data', (data) => {
 
   logWithoutNewLine("stdout", dataUtf8);
 
-  r = executionPlan[state];
+  let r = executionPlan[state];
 
   if (r && dataUtf8.endsWith(r.expect)) {
     state++;
