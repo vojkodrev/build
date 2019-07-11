@@ -19,7 +19,7 @@ function logWithoutNewLine(kind, text) {
   console.log(kind + ":", text);
 }
 
-p = spawn('cmd.exe')
+let p = spawn('cmd.exe');
 
 p.stderr.on('data', (data) => {
   let dataUtf8 = data.toString("utf-8");
