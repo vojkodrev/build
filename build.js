@@ -57,7 +57,9 @@ let executionPlan = [
   { expect: "C:\\code\\Configuration\\Configuration>", command: "yarn run publishAll", successCheck: "Done in " },
   { expect: "C:\\code\\Configuration\\Configuration>", command: "yarn run import-test-data", successCheck: "Testing data imported successfully." },
   
-  { expect: "C:\\code\\Configuration\\Configuration>", command: "cd ../platform/client" },
+  { expect: "C:\\code\\Configuration\\Configuration>", command: "cd .." },
+  
+  { expect: "C:\\code\\Configuration>", command: "cd platform/client" },
   { expect: "C:\\code\\Configuration\\Platform\\Client>", command: "npm install" },
   { expect: "C:\\code\\Configuration\\Platform\\Client>", command: "bower install" },
   { expect: "C:\\code\\Configuration\\Platform\\Client>", command: "npm run server" },
