@@ -11,11 +11,7 @@ if (!String.prototype.endsWith) {
 
 let p = spawn('cmd.exe');
 
-p.stderr.on('data', (data) => {
-  process.stderr.write(data);
-});
-
-let state = 0;
+p.stderr.pipe(process.stderr);
 
 let executionPlan = [
   { expect: process.cwd() + ">", command: "cd C:\\code\\configuration" },
@@ -54,6 +50,7 @@ let executionPlan = [
   
 ];
 
+let state = 0;
 let buffer = "";
 
 p.stdout.on('data', (data) => {
