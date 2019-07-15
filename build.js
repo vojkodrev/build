@@ -9,22 +9,10 @@ if (!String.prototype.endsWith) {
   };
 }
 
-function logStdWithoutNewLine(kind, text) {
-  if (text.endsWith("\r\n")) {
-    text = text.substring(0, text.length - 2);
-  } else if (text.endsWith("\n")) {
-    text = text.substring(0, text.length - 1);
-  }
-
-  console.log(kind + ":", text);
-}
-
 let p = spawn('cmd.exe');
 
 p.stderr.on('data', (data) => {
-  let dataUtf8 = data.toString("utf-8");
-  logStdWithoutNewLine("stderr", dataUtf8);
-
+  process.stderr.write(data);
 });
 
 let state = 0;
@@ -74,7 +62,7 @@ p.stdout.on('data', (data) => {
 
   buffer += dataUtf8;
 
-  logStdWithoutNewLine("stdout", dataUtf8);
+  process.stdout.write(data);
 
   let r = executionPlan[state];
 
@@ -82,14 +70,13 @@ p.stdout.on('data', (data) => {
 
     let previous = executionPlan[state - 1];
     if (previous && previous.successCheck && buffer.indexOf(previous.successCheck) == -1) {
-      console.error("FAILED!");
+      process.stderr.write("FAILED!\n");
       process.exit(1);
     } 
 
     state++;
     buffer = "";
 
-    logStdWithoutNewLine("stdin", r.command);
     p.stdin.write(r.command + "\n");
   }
 
