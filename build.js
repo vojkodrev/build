@@ -13,40 +13,42 @@ let p = spawn('cmd.exe');
 
 p.stderr.pipe(process.stderr);
 
+const ROOT_PATH = "C:\\code\\Sava";
+
 let executionPlan = [
-  { expect: process.cwd() + ">", command: "cd C:\\code\\configuration" },
+  { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
-  { expect: "C:\\code\\Configuration>", command: "cd platform" },
-  { expect: "C:\\code\\Configuration\\Platform>", command: "yarn install", successCheck: "Done in " },
+  { expect: `${ROOT_PATH}>`, command: `cd platform` },
+  { expect: `${ROOT_PATH}\\Platform>`, command: `yarn install`, successCheck: `Done in ` },
   
-  { expect: "C:\\code\\Configuration\\Platform>", command: "cd server\\build" },
-  { expect: "C:\\code\\Configuration\\Platform\\Server\\build>", command: "start.cmd", successCheck: "psake succeeded executing " },
-  { expect: "PS C:\\code\\Configuration\\Platform\\Server\\build> ", command: "Invoke-psake Build", successCheck: "psake succeeded executing psakefile.ps1" },
-  { expect: "PS C:\\code\\Configuration\\Platform\\Server\\build> ", command: "Invoke-psake Restore-Database-MSSQL", successCheck: "psake succeeded executing psakefile.ps1" },
-  { expect: "PS C:\\code\\Configuration\\Platform\\Server\\build> ", command: "exit" },
+  { expect: `${ROOT_PATH}\\Platform>`, command: `cd server\\build` },
+  { expect: `${ROOT_PATH}\\Platform\\Server\\build>`, command: `start.cmd`, successCheck: `psake succeeded executing ` },
+  { expect: `PS ${ROOT_PATH}\\Platform\\Server\\build> `, command: `Invoke-psake Build`, successCheck: `psake succeeded executing psakefile.ps1` },
+  { expect: `PS ${ROOT_PATH}\\Platform\\Server\\build> `, command: `Invoke-psake Restore-Database-MSSQL`, successCheck: `psake succeeded executing psakefile.ps1` },
+  { expect: `PS ${ROOT_PATH}\\Platform\\Server\\build> `, command: `exit` },
 
-  { expect: "C:\\code\\Configuration\\Platform\\Server\\build>", command: "cd ../../../" },
+  { expect: `${ROOT_PATH}\\Platform\\Server\\build>`, command: `cd ../../../` },
 
-  { expect: "C:\\code\\Configuration>", command: "cd Basic/build" },
-  { expect: "C:\\code\\Configuration\\Basic\\build>", command: "start.cmd", successCheck: "psake succeeded executing " },
-  { expect: "PS C:\\code\\Configuration\\Basic\\build> ", command: "Invoke-psake Build", successCheck: "psake succeeded executing psakefile.ps1" },
-  { expect: "PS C:\\code\\Configuration\\Basic\\build> ", command: "Invoke-psake Execute-Scripts-MSSQL", successCheck: "psake succeeded executing psakefile.ps1" },
-  { expect: "PS C:\\code\\Configuration\\Basic\\build> ", command: "exit" },
+  { expect: `${ROOT_PATH}>`, command: `cd Basic/build` },
+  { expect: `${ROOT_PATH}\\Basic\\build>`, command: `start.cmd`, successCheck: `psake succeeded executing ` },
+  { expect: `PS ${ROOT_PATH}\\Basic\\build> `, command: `Invoke-psake Build`, successCheck: `psake succeeded executing psakefile.ps1` },
+  { expect: `PS ${ROOT_PATH}\\Basic\\build> `, command: `Invoke-psake Execute-Scripts-MSSQL`, successCheck: `psake succeeded executing psakefile.ps1` },
+  { expect: `PS ${ROOT_PATH}\\Basic\\build> `, command: `exit` },
 
-  { expect: "C:\\code\\Configuration\\Basic\\build>", command: "cd ../../" },
+  { expect: `${ROOT_PATH}\\Basic\\build>`, command: `cd ../../` },
 
-  { expect: "C:\\code\\Configuration>", command: "cd configuration" },
-  { expect: "C:\\code\\Configuration\\Configuration>", command: "yarn install", successCheck: "Done in " },
-  { expect: "C:\\code\\Configuration\\Configuration>", command: "yarn run es-setup", successCheck: "Succeeded: " },
-  { expect: "C:\\code\\Configuration\\Configuration>", command: "yarn run publishAll", successCheck: "Done in " },
-  { expect: "C:\\code\\Configuration\\Configuration>", command: "yarn run import-test-data", successCheck: "Testing data imported successfully." },
+  { expect: `${ROOT_PATH}>`, command: `cd configuration` },
+  { expect: `${ROOT_PATH}\\Configuration>`, command: `yarn install`, successCheck: `Done in ` },
+  { expect: `${ROOT_PATH}\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: ` },
+  { expect: `${ROOT_PATH}\\Configuration>`, command: `yarn run publishAll`, successCheck: `Done in ` },
+  { expect: `${ROOT_PATH}\\Configuration>`, command: `yarn run import-test-data`, successCheck: `Testing data imported successfully.` },
   
-  { expect: "C:\\code\\Configuration\\Configuration>", command: "cd .." },
+  { expect: `${ROOT_PATH}\\Configuration>`, command: `cd ..` },
   
-  { expect: "C:\\code\\Configuration>", command: "cd platform/client" },
-  { expect: "C:\\code\\Configuration\\Platform\\Client>", command: "npm install" },
-  { expect: "C:\\code\\Configuration\\Platform\\Client>", command: "bower install" },
-  { expect: "C:\\code\\Configuration\\Platform\\Client>", command: "npm run server" },
+  { expect: `${ROOT_PATH}>`, command: `cd platform/client` },
+  { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `npm install` },
+  { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `bower install` },
+  { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `npm run server` },
   
 ];
 
