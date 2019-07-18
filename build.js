@@ -13,7 +13,7 @@ let p = spawn('cmd.exe');
 
 p.stderr.pipe(process.stderr);
 
-const ROOT_PATH = "C:\\code\\Configuration";
+const ROOT_PATH = "C:\\code\\Sava";
 
 let executionPlan = [
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
