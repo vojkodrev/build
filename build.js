@@ -29,14 +29,6 @@ let executionPlan = [
 
   { expect: `${ROOT_PATH}\\Platform\\Server\\build>`, command: `cd ../../../` },
 
-  // { expect: `${ROOT_PATH}>`, command: `cd Basic/build` },
-  // { expect: `${ROOT_PATH}\\Basic\\build>`, command: `start.cmd`, successCheck: `psake succeeded executing ` },
-  // { expect: `PS ${ROOT_PATH}\\Basic\\build> `, command: `Invoke-psake Build`, successCheck: `psake succeeded executing psakefile.ps1` },
-  // { expect: `PS ${ROOT_PATH}\\Basic\\build> `, command: `Invoke-psake Execute-Scripts-MSSQL`, successCheck: `psake succeeded executing psakefile.ps1` },
-  // { expect: `PS ${ROOT_PATH}\\Basic\\build> `, command: `exit` },
-
-  // { expect: `${ROOT_PATH}\\Basic\\build>`, command: `cd ../../` },
-
   { expect: `${ROOT_PATH}>`, command: `cd implementation/build/` },
   { expect: `${ROOT_PATH}\\implementation\\build>`, command: `start.cmd`, successCheck: `psake succeeded executing ` },  
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Build`, successCheck: `psake succeeded executing psakefile.ps1` },
