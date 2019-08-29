@@ -57,15 +57,13 @@ let buffer = "";
 
 p.stdout.on('data', (data) => {
   
-  let dataUtf8 = data.toString("utf-8");
-
-  buffer += dataUtf8;
+  buffer += data.toString("utf-8");
 
   process.stdout.write(data);
 
   let r = executionPlan[state];
 
-  if (r && dataUtf8.endsWith(r.expect)) {
+  if (r && buffer.endsWith(r.expect)) {
 
     let previous = executionPlan[state - 1];
     if (previous && previous.successCheck && buffer.indexOf(previous.successCheck) == -1) {
