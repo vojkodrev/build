@@ -36,6 +36,7 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Import-CSV`, successCheck: `psake succeeded executing psakefile.ps1` },
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `exit` },
   { expect: `${ROOT_PATH}\\implementation\\build>`, command: `cd ..\\configuration` },
+  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn upgrade`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn install`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: ` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run publishAll`, successCheck: `Done in ` },
