@@ -19,6 +19,7 @@ let executionPlan = [
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
   { expect: `${ROOT_PATH}>`, command: `cd platform` },
+  { expect: `${ROOT_PATH}\\Platform>`, command: `yarn upgrade`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\Platform>`, command: `yarn install`, successCheck: `Done in ` },
   
   { expect: `${ROOT_PATH}\\Platform>`, command: `cd server\\build` },
@@ -45,6 +46,7 @@ let executionPlan = [
 
   { expect: `${ROOT_PATH}>`, command: `cd Platform\\Client` },
   { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `npm install` },
+  { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `bower update` },
   { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `bower install` },
   { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `npm run server` },
   
