@@ -29,7 +29,7 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}\\Platform\\Server\\build> `, command: `exit` },
 
   { expect: `${ROOT_PATH}\\Platform\\Server\\build>`, command: `cd ../../../` },
-
+  
   { expect: `${ROOT_PATH}>`, command: `cd implementation/build/` },
   { expect: `${ROOT_PATH}\\implementation\\build>`, command: `start.cmd`, successCheck: `psake succeeded executing ` },  
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Build`, successCheck: `psake succeeded executing psakefile.ps1` },
@@ -45,6 +45,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `cd ../..` },
 
   { expect: `${ROOT_PATH}>`, command: `cd Platform\\Client` },
+  { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `npm update` },  
   { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `npm install` },
   { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `bower update` },
   { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `bower install` },
