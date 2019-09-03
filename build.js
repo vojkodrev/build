@@ -19,7 +19,6 @@ let executionPlan = [
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
   { expect: `${ROOT_PATH}>`, command: `cd platform` },
-  { expect: `${ROOT_PATH}\\Platform>`, command: `yarn upgrade`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\Platform>`, command: `yarn install`, successCheck: `Done in ` },
   
   { expect: `${ROOT_PATH}\\Platform>`, command: `cd server\\build` },
@@ -37,7 +36,6 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Import-CSV`, successCheck: `psake succeeded executing psakefile.ps1` },
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `exit` },
   { expect: `${ROOT_PATH}\\implementation\\build>`, command: `cd ..\\configuration` },
-  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn upgrade`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn install`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: ` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run publishAll`, successCheck: `Done in ` },
@@ -45,9 +43,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `cd ../..` },
 
   { expect: `${ROOT_PATH}>`, command: `cd Platform\\Client` },
-  { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `npm update` },  
   { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `npm install` },
-  { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `bower update` },
   { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `bower install` },
   { expect: `${ROOT_PATH}\\Platform\\Client>`, command: `npm run server` },
   
