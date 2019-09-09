@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const fs = require('fs');
 
 if (!String.prototype.endsWith) {
   String.prototype.endsWith = function(search, this_len) {
@@ -9,11 +10,23 @@ if (!String.prototype.endsWith) {
   };
 }
 
+const ROOT_PATH = "C:\\code\\Sava";
+
+function replaceInFile(file, text, newText) {
+  let data = fs.readFileSync(file).toString("utf-8");
+
+  if (data.indexOf(newText) == -1) {
+    data = data.replace(text, newText);
+
+    fs.writeFileSync(file, data);
+  }
+}
+
+replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
+
 let p = spawn('cmd.exe');
 
 p.stderr.pipe(process.stderr);
-
-const ROOT_PATH = "C:\\code\\Sava";
 
 let executionPlan = [
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
