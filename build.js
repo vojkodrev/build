@@ -22,7 +22,7 @@ function replaceInFile(file, text, newText) {
   }
 }
 
-replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '[string]$DatabaseType = "MSSQL",', '[string]$DatabaseType = "Oracle",')
+// replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '[string]$DatabaseType = "MSSQL",', '[string]$DatabaseType = "Oracle",')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
 
 let p = spawn('cmd.exe');
@@ -38,7 +38,7 @@ let executionPlan = [
   // { expect: `${ROOT_PATH}\\Platform>`, command: `cd server\\build` },
 
   { expect: `${ROOT_PATH}\\mono>`, command: `powershell` },
-  { expect: `PS ${ROOT_PATH}\\mono> `, command: `.\\build.ps1 -Build`, errorCheck: `Build finished with errors` },
+  { expect: `PS ${ROOT_PATH}\\mono> `, command: `.\\build.ps1 -Build`, errorCheck: [`Build finished with errors`, `Could not find a part of the path`] },
   { expect: `PS ${ROOT_PATH}\\mono> `, command: `.\\build.ps1 -Restore`, successCheck: `Upgrade successful` },
 
   { expect: `PS ${ROOT_PATH}\\mono> `, command: `exit` },
@@ -62,7 +62,7 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `exit` },
   { expect: `${ROOT_PATH}\\implementation\\build>`, command: `cd ..\\configuration` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn install`, successCheck: `Done in ` },
-  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: ` },
+  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: `, errorCheck: `No Living connections` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run publishAll`, successCheck: `Done in ` },
 
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `cd ../..` },
@@ -82,6 +82,19 @@ function fail() {
 let state = 0;
 let buffer = "";
 
+function errorFromArrayOccurred(array, buffer) {
+  if (Array.isArray(array)) {
+    for (let i = 0; i < array.length; i++) {
+      const error = array[i];
+      if (buffer.indexOf(error) != -1) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 p.stdout.on('data', (data) => {
   
   buffer += data.toString("utf-8");
@@ -95,7 +108,8 @@ p.stdout.on('data', (data) => {
   // console.log("previous =", previous);
   // console.log("state =", state);
 
-  if (previous && previous.errorCheck && buffer.indexOf(previous.errorCheck) != -1) {
+  if (previous && previous.errorCheck && (errorFromArrayOccurred(previous.errorCheck, buffer) || buffer.indexOf(previous.errorCheck) != -1)) {
+
     fail();
   }
   else if (current && buffer.endsWith(current.expect)) {
