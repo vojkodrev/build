@@ -22,6 +22,7 @@ function replaceInFile(file, text, newText) {
   }
 }
 
+replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '[string]$DatabaseType = "MSSQL",', '[string]$DatabaseType = "Oracle",')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
 
 let p = spawn('cmd.exe');
