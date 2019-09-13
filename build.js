@@ -10,7 +10,7 @@ if (!String.prototype.endsWith) {
   };
 }
 
-const ROOT_PATH = "C:\\code\\Sava";
+const ROOT_PATH = "c:\\Code\\Sava";
 
 function replaceInFile(file, text, newText) {
   let data = fs.readFileSync(file).toString("utf-8");
@@ -38,8 +38,8 @@ let executionPlan = [
   // { expect: `${ROOT_PATH}\\Platform>`, command: `cd server\\build` },
 
   { expect: `${ROOT_PATH}\\mono>`, command: `powershell` },
-  { expect: `PS ${ROOT_PATH}\\mono> `, command: `.\\build.ps1 -Build`, errorCheck: [`Build finished with errors`, `Could not find a part of the path`] },
-  { expect: `PS ${ROOT_PATH}\\mono> `, command: `.\\build.ps1 -Restore`, successCheck: `Upgrade successful` },
+  { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Build`, errorCheck: [`Build finished with errors`, `Could not find a part of the path`] },
+  { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Restore`, successCheck: `Upgrade successful` },
 
   { expect: `PS ${ROOT_PATH}\\mono> `, command: `exit` },
 
@@ -86,7 +86,7 @@ function errorFromArrayOccurred(array, buffer) {
   if (Array.isArray(array)) {
     for (let i = 0; i < array.length; i++) {
       const error = array[i];
-      if (buffer.indexOf(error) != -1) {
+      if (buffer.indexOf(error.toUpperCase()) != -1) {
         return true;
       }
     }
@@ -97,7 +97,7 @@ function errorFromArrayOccurred(array, buffer) {
 
 p.stdout.on('data', (data) => {
   
-  buffer += data.toString("utf-8");
+  buffer += data.toString("utf-8").toUpperCase();
 
   process.stdout.write(data);
 
@@ -108,13 +108,16 @@ p.stdout.on('data', (data) => {
   // console.log("previous =", previous);
   // console.log("state =", state);
 
-  if (previous && previous.errorCheck && (errorFromArrayOccurred(previous.errorCheck, buffer) || buffer.indexOf(previous.errorCheck) != -1)) {
+  if (previous && previous.errorCheck && (
+    errorFromArrayOccurred(previous.errorCheck, buffer) || 
+    typeof previous.errorCheck == "string" && buffer.indexOf(previous.errorCheck.toUpperCase()) != -1)
+  ) {
 
     fail();
   }
-  else if (current && buffer.endsWith(current.expect)) {
+  else if (current && buffer.endsWith(current.expect.toUpperCase())) {
 
-    if (previous && previous.successCheck && buffer.indexOf(previous.successCheck) == -1) {
+    if (previous && previous.successCheck && buffer.indexOf(previous.successCheck.toUpperCase()) == -1) {
       fail();
     } 
 
