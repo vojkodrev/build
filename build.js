@@ -1,33 +1,4 @@
-const { spawn } = require('child_process');
-const fs = require('fs');
-
-if (!String.prototype.endsWith) {
-  String.prototype.endsWith = function(search, this_len) {
-    if (this_len === undefined || this_len > this.length) {
-      this_len = this.length;
-    }
-    return this.substring(this_len - search.length, this_len) === search;
-  };
-}
-
 const ROOT_PATH = "c:\\Code\\Sava";
-
-function replaceInFile(file, text, newText) {
-  let data = fs.readFileSync(file).toString("utf-8");
-
-  if (data.indexOf(newText) == -1) {
-    data = data.replace(text, newText);
-
-    fs.writeFileSync(file, data);
-  }
-}
-
-// replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '[string]$DatabaseType = "MSSQL",', '[string]$DatabaseType = "Oracle",')
-replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
-
-let p = spawn('cmd.exe');
-
-p.stderr.pipe(process.stderr);
 
 let executionPlan = [
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
@@ -74,13 +45,32 @@ let executionPlan = [
   
 ];
 
+const { spawn } = require('child_process');
+const fs = require('fs');
+
+if (!String.prototype.endsWith) {
+  String.prototype.endsWith = function(search, this_len) {
+    if (this_len === undefined || this_len > this.length) {
+      this_len = this.length;
+    }
+    return this.substring(this_len - search.length, this_len) === search;
+  };
+}
+
+function replaceInFile(file, text, newText) {
+  let data = fs.readFileSync(file).toString("utf-8");
+
+  if (data.indexOf(newText) == -1) {
+    data = data.replace(text, newText);
+
+    fs.writeFileSync(file, data);
+  }
+}
+
 function fail() {
   process.stderr.write("FAILED!\n");
   process.exit(1);
 }
-
-let state = 0;
-let buffer = "";
 
 function errorFromArrayOccurred(array, buffer) {
   if (Array.isArray(array)) {
@@ -94,6 +84,16 @@ function errorFromArrayOccurred(array, buffer) {
 
   return false;
 }
+
+// replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '[string]$DatabaseType = "MSSQL",', '[string]$DatabaseType = "Oracle",')
+replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
+
+let p = spawn('cmd.exe');
+
+p.stderr.pipe(process.stderr);
+
+let state = 0;
+let buffer = "";
 
 p.stdout.on('data', (data) => {
   
