@@ -23,7 +23,7 @@ let executionPlan = [
   
   { expect: `${ROOT_PATH}>`, command: `cd implementation/configuration/` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn install`, successCheck: `Done in ` },
-  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`] },
+  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run publishAll`, successCheck: `Done in ` },
 
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `cd ../..` },
@@ -60,17 +60,27 @@ function fail() {
   process.exit(1);
 }
 
-function errorFromArrayOccurred(array, buffer, errorBuffer) {
+function errorFromArrayOccurred(array, buffer) {
   if (Array.isArray(array)) {
     for (let i = 0; i < array.length; i++) {
       const error = array[i];
-      if (buffer.indexOf(error.toUpperCase()) != -1 || errorBuffer.indexOf(error.toUpperCase()) != -1) {
+      if (buffer.indexOf(error.toUpperCase()) != -1) {
         return true;
       }
     }
   }
 
   return false;
+}
+
+function failOnError(item, buffer) {
+  if (item && item.errorCheck && (
+    errorFromArrayOccurred(item.errorCheck, buffer) || 
+    typeof item.errorCheck == "string" && buffer.indexOf(item.errorCheck.toUpperCase()) != -1)
+  ) {
+
+    fail();
+  }
 }
 
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
@@ -84,6 +94,10 @@ let errorBuffer = "";
 p.stderr.on('data', (data) => {
   errorBuffer += data.toString("utf-8").toUpperCase();
   process.stderr.write(data);
+
+  let previous = executionPlan[state - 1];
+
+  failOnError(previous, errorBuffer);
 });
 
 p.stdout.on('data', (data) => {
@@ -95,14 +109,9 @@ p.stdout.on('data', (data) => {
   let current = executionPlan[state];
   let previous = executionPlan[state - 1];
 
-  if (previous && previous.errorCheck && (
-    errorFromArrayOccurred(previous.errorCheck, buffer, errorBuffer) || 
-    typeof previous.errorCheck == "string" && (buffer.indexOf(previous.errorCheck.toUpperCase()) != -1 || errorBuffer.indexOf(previous.errorCheck.toUpperCase()) != -1))
-  ) {
+  failOnError(previous, buffer);
 
-    fail();
-  }
-  else if (current && buffer.endsWith(current.expect.toUpperCase())) {
+  if (current && buffer.endsWith(current.expect.toUpperCase())) {
 
     if (previous && previous.successCheck && buffer.indexOf(previous.successCheck.toUpperCase()) == -1) {
       fail();
@@ -110,6 +119,7 @@ p.stdout.on('data', (data) => {
 
     state++;
     buffer = "";
+    errorBuffer = "";
 
     p.stdin.write(current.command + "\n");
   }
