@@ -8,7 +8,6 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\mono>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Build`, errorCheck: [`Build finished with errors`, `Could not find a part of the path`] },
   { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Restore -DatabaseType Oracle`, successCheck: `Upgrade successful` },
-
   { expect: `PS ${ROOT_PATH}\\mono> `, command: `exit` },
 
   { expect: `${ROOT_PATH}\\mono>`, command: `cd ..` },
@@ -19,7 +18,10 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Execute-Scripts`, successCheck: `psake succeeded executing psakefile.ps1` },
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Import-CSV`, successCheck: `psake succeeded executing psakefile.ps1` },
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `exit` },
-  { expect: `${ROOT_PATH}\\implementation\\build>`, command: `cd ..\\configuration` },
+  
+  { expect: `${ROOT_PATH}\\implementation\\build>`, command: `cd ../..` },
+  
+  { expect: `${ROOT_PATH}>`, command: `cd implementation/configuration/` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn install`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`] },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run publishAll`, successCheck: `Done in ` },
