@@ -60,11 +60,11 @@ function fail() {
   process.exit(1);
 }
 
-function errorFromArrayOccurred(array, buffer) {
+function errorFromArrayOccurred(array, buffer, errorBuffer) {
   if (Array.isArray(array)) {
     for (let i = 0; i < array.length; i++) {
       const error = array[i];
-      if (buffer.indexOf(error.toUpperCase()) != -1) {
+      if (buffer.indexOf(error.toUpperCase()) != -1 || errorBuffer.indexOf(error.toUpperCase()) != -1) {
         return true;
       }
     }
@@ -77,10 +77,14 @@ replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/
 
 let p = spawn('cmd.exe');
 
-p.stderr.pipe(process.stderr);
-
 let state = 0;
 let buffer = "";
+let errorBuffer = "";
+
+p.stderr.on('data', (data) => {
+  errorBuffer += data.toString("utf-8").toUpperCase();
+  process.stderr.write(data);
+});
 
 p.stdout.on('data', (data) => {
   
@@ -92,8 +96,8 @@ p.stdout.on('data', (data) => {
   let previous = executionPlan[state - 1];
 
   if (previous && previous.errorCheck && (
-    errorFromArrayOccurred(previous.errorCheck, buffer) || 
-    typeof previous.errorCheck == "string" && buffer.indexOf(previous.errorCheck.toUpperCase()) != -1)
+    errorFromArrayOccurred(previous.errorCheck, buffer, errorBuffer) || 
+    typeof previous.errorCheck == "string" && (buffer.indexOf(previous.errorCheck.toUpperCase()) != -1 || errorBuffer.indexOf(previous.errorCheck.toUpperCase()) != -1))
   ) {
 
     fail();
