@@ -21,7 +21,7 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `exit` },
   { expect: `${ROOT_PATH}\\implementation\\build>`, command: `cd ..\\configuration` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn install`, successCheck: `Done in ` },
-  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: `, errorCheck: `No Living connections` },
+  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`] },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run publishAll`, successCheck: `Done in ` },
 
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `cd ../..` },
