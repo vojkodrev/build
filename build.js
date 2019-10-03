@@ -6,7 +6,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}>`, command: `cd mono` },
 
   { expect: `${ROOT_PATH}\\mono>`, command: `powershell` },
-  { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Build`, errorCheck: [`Build finished with errors`, `Could not find a part of the path`] },
+  { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Build`, errorCheck: [`Build finished with errors`, `Could not find a part of the path`, 'An unexpected error occoured'] },
   { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Restore -DatabaseType Oracle`, successCheck: `Upgrade successful` },
   { expect: `PS ${ROOT_PATH}\\mono> `, command: `exit` },
 
@@ -48,7 +48,7 @@ if (!String.prototype.endsWith) {
 function replaceInFile(file, text, newText) {
   let data = fs.readFileSync(file).toString("utf-8");
 
-  if (data.indexOf(newText) == -1) {
+  if (newText === '' || data.indexOf(newText) == -1) {
     data = data.replace(text, newText);
 
     fs.writeFileSync(file, data);
@@ -83,7 +83,8 @@ function failOnError(item, buffer) {
   }
 }
 
-replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '# /nr:false `')
+replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '/nr:true `')
+replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/verbosity:minimal `', '/verbosity:normal `')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
 
 let p = spawn('cmd.exe');
