@@ -1,6 +1,9 @@
 const ROOT_PATH = "c:\\Code\\Sava";
 
 let executionPlan = [
+
+  { command: `set PROMPT=$P$G` },
+
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
   { expect: `${ROOT_PATH}>`, command: `cd mono` },
@@ -113,7 +116,7 @@ p.stdout.on('data', (data) => {
 
   failOnError(previous, buffer);
 
-  if (current && buffer.endsWith(current.expect.toUpperCase())) {
+  if (current && (!current.expect || buffer.endsWith(current.expect.toUpperCase()))) {
 
     if (previous && previous.successCheck && buffer.indexOf(previous.successCheck.toUpperCase()) == -1) {
       fail();
