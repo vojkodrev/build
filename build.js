@@ -32,6 +32,8 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `cd ../..` },
 
   { expect: `${ROOT_PATH}>`, command: `cd mono\\client` },
+  { expect: `${ROOT_PATH}\\mono\\client>`, command: `npm install`},
+  { expect: `${ROOT_PATH}\\mono\\client>`, command: `bower install`},
   { expect: `${ROOT_PATH}\\mono\\client>`, command: `npm run server` },
   
 ];
@@ -59,7 +61,7 @@ function replaceInFile(file, text, newText) {
 }
 
 function fail() {
-  process.stderr.write("FAILED!\n");
+  console.error("FAILED!");
   process.exit(1);
 }
 
