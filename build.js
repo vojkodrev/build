@@ -18,7 +18,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}>`, command: `cd implementation/build/` },
   { expect: `${ROOT_PATH}\\implementation\\build>`, command: `start.cmd`, successCheck: `psake succeeded executing ` },  
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Build`, successCheck: `psake succeeded executing psakefile.ps1` },
-  { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Execute-Scripts -parameters @{"dbORCLdomain" = "adacta-fintech.com"}`, successCheck: `psake succeeded executing psakefile.ps1` },
+  { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Execute-Scripts`, successCheck: `psake succeeded executing psakefile.ps1` },
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Import-CSV`, successCheck: `psake succeeded executing psakefile.ps1` },
   { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `exit` },
   
@@ -91,6 +91,7 @@ function failOnError(item, buffer) {
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '/nr:true `')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/verbosity:minimal `', '/verbosity:normal `')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
+replaceInFile(`${ROOT_PATH}/implementation/build/psakefile.ps1`, '$dbORCLdomain="si.corp.adacta-group.com"', '$dbORCLdomain="adacta-fintech.com"')
 
 let p = spawn('cmd.exe');
 
