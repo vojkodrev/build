@@ -6,8 +6,8 @@ let executionPlan = [
 
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
-  { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"node_modules\\" -exec rm -rf {} +"' },  
-  { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"bower_components\\" -exec rm -rf {} +"' },  
+  { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"node_modules\\" -exec rm -rf {} +"', errorCheck: `cannot remove` },
+  { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"bower_components\\" -exec rm -rf {} +"', errorCheck: `cannot remove` },  
 
   { expect: `${ROOT_PATH}>`, command: `cd mono` },
 
