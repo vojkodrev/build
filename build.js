@@ -12,7 +12,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}>`, command: `cd mono` },
 
   { expect: `${ROOT_PATH}\\mono>`, command: `powershell` },
-  { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Build -SkipBasic`, errorCheck: [`Build finished with errors`, `Could not find a part of the path`, 'An unexpected error occoured', "-- FAILED"] },
+  { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Build -SkipBasic`, successCheck: `0 Error(s)`, errorCheck: [`Build finished with errors`, `Could not find a part of the path`, 'An unexpected error occoured', "-- FAILED"] },
   { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Restore -DatabaseType Oracle -SkipBasic -DatabaseOracleSID "ORCL" -DatabaseOracleDomain "adacta-fintech.com"`, successCheck: `Upgrade successful` },
   { expect: `PS ${ROOT_PATH}\\mono> `, command: `exit` },
 
