@@ -2,8 +2,6 @@ const ROOT_PATH = "c:\\Code\\Sava";
 
 let executionPlan = [
 
-  { command: `set PROMPT=$P$G` },
-
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
   { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"node_modules\\" -exec rm -rf {} +"', errorCheck: `cannot remove` },
@@ -30,16 +28,13 @@ let executionPlan = [
   { expect: `${ROOT_PATH}>`, command: `cd implementation/configuration/` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn install`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `Succeeded: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
-  // { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run build`, successCheck: `Done in `, errorCheck: "Error: ENOENT: no such file or directory" },
-  // { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run resolve_translations`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run publishAll`, successCheck: `Done in ` },
 
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `cd ../..` },
 
   { expect: `${ROOT_PATH}>`, command: `cd mono\\client` },
-  { expect: `${ROOT_PATH}\\mono\\client>`, command: `npm install`},
-  { expect: `${ROOT_PATH}\\mono\\client>`, command: `bower install`},
-  { expect: `${ROOT_PATH}\\mono\\client>`, command: `npm run server` },
+  { expect: `${ROOT_PATH}\\mono\\client>`, command: `yarn install`},
+  { expect: `${ROOT_PATH}\\mono\\client>`, command: `yarn run start` },
   
 ];
 
