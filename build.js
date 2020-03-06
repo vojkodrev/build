@@ -5,7 +5,7 @@ let executionPlan = [
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
   { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"node_modules\\" -exec rm -rf {} +"', errorCheck: `cannot remove` },
-  { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"bower_components\\" -exec rm -rf {} +"', errorCheck: `cannot remove` },  
+  // { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"bower_components\\" -exec rm -rf {} +"', errorCheck: `cannot remove` },  
 
   { expect: `${ROOT_PATH}>`, command: `cd mono` },
 
@@ -32,6 +32,18 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run publish-workspace`, successCheck: `Done in ` },
 
   { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `cd ../..` },
+
+  { expect: `${ROOT_PATH}>`, command: `cd implementation\\configuration\\configuration\\@config-sava-hr\\Party\\masterEntity\\NaturalPerson` },
+  { expect: `${ROOT_PATH}\\implementation\\configuration\\configuration\\@config-sava-hr\\Party\\masterEntity\\NaturalPerson>`, command: `yarn run test-api`, successCheck: `Done in ` },
+  { expect: `${ROOT_PATH}\\implementation\\configuration\\configuration\\@config-sava-hr\\Party\\masterEntity\\NaturalPerson>`, command: `cd ${ROOT_PATH}` },
+
+  { expect: `${ROOT_PATH}>`, command: `cd implementation\\configuration\\configuration\\@config-sava-hr\\Organisation\\masterEntity\\Agent` },
+  { expect: `${ROOT_PATH}\\implementation\\configuration\\configuration\\@config-sava-hr\\Organisation\\masterEntity\\Agent>`, command: `yarn run test-api`, successCheck: `Done in ` },
+  { expect: `${ROOT_PATH}\\implementation\\configuration\\configuration\\@config-sava-hr\\Organisation\\masterEntity\\Agent>`, command: `cd ${ROOT_PATH}` },  
+
+  { expect: `${ROOT_PATH}>`, command: `cd implementation\\Configuration\\configuration\\@config-sava-hr\\SalesProductNonLife\\document\\ErgoMigrationQuote` },
+  { expect: `${ROOT_PATH}\\implementation\\Configuration\\configuration\\@config-sava-hr\\SalesProductNonLife\\document\\ErgoMigrationQuote>`, command: `yarn run test-api`, successCheck: `Done in ` },
+  { expect: `${ROOT_PATH}\\implementation\\Configuration\\configuration\\@config-sava-hr\\SalesProductNonLife\\document\\ErgoMigrationQuote>`, command: `cd ${ROOT_PATH}` },    
 
   { expect: `${ROOT_PATH}>`, command: `cd mono\\client` },
   { expect: `${ROOT_PATH}\\mono\\client>`, command: `yarn install`},
