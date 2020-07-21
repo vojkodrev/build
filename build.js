@@ -5,45 +5,33 @@ let executionPlan = [
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
   { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"node_modules\\" -exec rm -rf {} +"', errorCheck: `cannot remove` },
-  // { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"bower_components\\" -exec rm -rf {} +"', errorCheck: `cannot remove` },  
-
+  
   { expect: `${ROOT_PATH}>`, command: `cd mono` },
 
   { expect: `${ROOT_PATH}\\mono>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Build -SkipBasic`, successCheck: `0 Error(s)`, errorCheck: [`Build finished with errors`, `Could not find a part of the path`, 'An unexpected error occoured', "-- FAILED"] },
-  { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Restore -DatabaseType Oracle -SkipBasic -DatabaseOracleSID "ORCL" -DatabaseOracleDomain "adacta-fintech.com"`, successCheck: `Upgrade successful` },
+  { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -Restore -DatabaseType Oracle -SkipBasic`, successCheck: `Upgrade successful`, errorCheck: ['ERROR at line'] },
   { expect: `PS ${ROOT_PATH}\\mono> `, command: `exit` },
 
   { expect: `${ROOT_PATH}\\mono>`, command: `cd ..` },
 
-  { expect: `${ROOT_PATH}>`, command: `cd implementation/build/` },
-  { expect: `${ROOT_PATH}\\implementation\\build>`, command: `start.cmd`, successCheck: `psake succeeded executing ` },  
-  { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Build`, successCheck: `psake succeeded executing psakefile.ps1` },
-  { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Execute-Scripts`, successCheck: `psake succeeded executing psakefile.ps1` },
-  { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `Invoke-psake Import-CSV`, successCheck: `psake succeeded executing psakefile.ps1` },
-  { expect: `PS ${ROOT_PATH}\\implementation\\build> `, command: `exit` },
+  { expect: `${ROOT_PATH}>`, command: `powershell` },
+  { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -BuildPrintouts -ExecuteScripts -EnvironmentTarget hr`, successCheck: `Upgrade successful` },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ImportCSV`, successCheck: 'Done in ' },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
   
-  { expect: `${ROOT_PATH}\\implementation\\build>`, command: `cd ../..` },
+  { expect: `${ROOT_PATH}>`, command: `cd implementation\\.adi` },
+  { expect: `${ROOT_PATH}\\implementation\\.adi>`, command: `git clean -fdx` },
+  { expect: `${ROOT_PATH}\\implementation\\.adi>`, command: `cd ../..` },
   
-  { expect: `${ROOT_PATH}>`, command: `cd implementation/configuration/` },
-  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn install`, successCheck: `Done in ` },
-  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run es-setup`, successCheck: `successfully: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
-  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run validate-workspace`, successCheck: `Done in ` },
-  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `yarn run publish-workspace`, successCheck: `Done in ` },
+  { expect: `${ROOT_PATH}>`, command: `cd implementation/` },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run es-setup-hr`, successCheck: `successfully: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
 
-  { expect: `${ROOT_PATH}\\implementation\\Configuration>`, command: `cd ../..` },
-
-  { expect: `${ROOT_PATH}>`, command: `cd implementation\\configuration\\configuration\\@config-sava-hr\\Party\\masterEntity\\NaturalPerson` },
-  { expect: `${ROOT_PATH}\\implementation\\configuration\\configuration\\@config-sava-hr\\Party\\masterEntity\\NaturalPerson>`, command: `yarn run test-api`, successCheck: `Done in ` },
-  { expect: `${ROOT_PATH}\\implementation\\configuration\\configuration\\@config-sava-hr\\Party\\masterEntity\\NaturalPerson>`, command: `cd ${ROOT_PATH}` },
-
-  { expect: `${ROOT_PATH}>`, command: `cd implementation\\configuration\\configuration\\@config-sava-hr\\Organisation\\masterEntity\\Agent` },
-  { expect: `${ROOT_PATH}\\implementation\\configuration\\configuration\\@config-sava-hr\\Organisation\\masterEntity\\Agent>`, command: `yarn run test-api`, successCheck: `Done in ` },
-  { expect: `${ROOT_PATH}\\implementation\\configuration\\configuration\\@config-sava-hr\\Organisation\\masterEntity\\Agent>`, command: `cd ${ROOT_PATH}` },  
-
-  { expect: `${ROOT_PATH}>`, command: `cd implementation\\Configuration\\configuration\\@config-sava-hr\\SalesProductNonLife\\document\\ErgoMigrationQuote` },
-  { expect: `${ROOT_PATH}\\implementation\\Configuration\\configuration\\@config-sava-hr\\SalesProductNonLife\\document\\ErgoMigrationQuote>`, command: `yarn run test-api`, successCheck: `Done in ` },
-  { expect: `${ROOT_PATH}\\implementation\\Configuration\\configuration\\@config-sava-hr\\SalesProductNonLife\\document\\ErgoMigrationQuote>`, command: `cd ${ROOT_PATH}` },    
+  { expect: `${ROOT_PATH}\\implementation>`, command: `cd ..` },
 
   { expect: `${ROOT_PATH}>`, command: `cd mono\\client` },
   { expect: `${ROOT_PATH}\\mono\\client>`, command: `yarn install`},
@@ -103,8 +91,8 @@ function failOnError(item, buffer) {
 
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '/nr:true `')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/verbosity:minimal `', '/verbosity:normal `')
-replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
-replaceInFile(`${ROOT_PATH}/implementation/build/psakefile.ps1`, '$dbORCLdomain="si.corp.adacta-group.com"', '$dbORCLdomain="adacta-fintech.com"')
+// replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
+// replaceInFile(`${ROOT_PATH}/implementation/build/psakefile.ps1`, '$dbORCLdomain="adacta-fintech.com"', '$dbORCLdomain=""')
 
 let p = spawn('cmd.exe');
 
@@ -138,11 +126,23 @@ p.stdout.on('data', (data) => {
       fail();
     } 
 
-    state++;
     buffer = "";
     errorBuffer = "";
 
-    p.stdin.write(current.command + "\n");
+    while (true) {
+      current = executionPlan[state];
+
+      if (!current) {
+        break;
+      }
+
+      state++;
+
+      if (!current.argv || process.argv.filter(i => i == current.argv).length > 0) {
+        p.stdin.write(current.command + "\n");
+        break;
+      }
+    }
   }
 
 });
