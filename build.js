@@ -93,6 +93,8 @@ replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '/nr:true `')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/verbosity:minimal `', '/verbosity:normal `')
 // replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
 // replaceInFile(`${ROOT_PATH}/implementation/build/psakefile.ps1`, '$dbORCLdomain="adacta-fintech.com"', '$dbORCLdomain=""')
+replaceInFile(`${ROOT_PATH}/implementation/configuration.json`, '"targetLayer": "sava-si"', '"targetLayer": "sava-hr"')
+replaceInFile(`${ROOT_PATH}/implementation/configuration.json`, '"localCurrency": "EUR"', '"localCurrency": "HRK"')
 
 let p = spawn('cmd.exe');
 
