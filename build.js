@@ -17,8 +17,8 @@ let executionPlan = [
 
   { expect: `${ROOT_PATH}>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -BuildPrintouts -ExecuteScripts -EnvironmentTarget hr`, successCheck: `Upgrade successful` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ImportCSV`, successCheck: 'Done in ' },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -BuildPrintouts -ExecuteScripts -EnvironmentTarget si`, successCheck: `Upgrade successful` },
+  // { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ImportCSV`, successCheck: 'Done in ' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
   
   { expect: `${ROOT_PATH}>`, command: `cd implementation\\.adi` },
@@ -26,7 +26,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation\\.adi>`, command: `cd ../..` },
   
   { expect: `${ROOT_PATH}>`, command: `cd implementation/` },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run es-setup-hr`, successCheck: `successfully: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run es-setup-si`, successCheck: `successfully: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
@@ -93,6 +93,8 @@ replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '/nr:true `')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/verbosity:minimal `', '/verbosity:normal `')
 // replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
 // replaceInFile(`${ROOT_PATH}/implementation/build/psakefile.ps1`, '$dbORCLdomain="adacta-fintech.com"', '$dbORCLdomain=""')
+replaceInFile(`${ROOT_PATH}/implementation/configuration.json`, '"targetLayer": "sava-hr"', '"targetLayer": "sava-si"')
+replaceInFile(`${ROOT_PATH}/implementation/configuration.json`, '"localCurrency": "HRK"', '"localCurrency": "EUR"')
 
 let p = spawn('cmd.exe');
 
