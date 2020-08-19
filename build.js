@@ -26,7 +26,7 @@ let executionPlan = [
 
   { expect: `${ROOT_PATH}>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -BuildPrintouts -ExecuteScripts -EnvironmentTarget hr`, successCheck: `Upgrade successful`, errorCheck: ['401 Unauthorized'] },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -BuildPrintouts -ExecuteScripts -EnvironmentTarget si`, successCheck: `Upgrade successful`, errorCheck: ['401 Unauthorized'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ImportCSV`, successCheck: 'Done in ' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
   
@@ -103,8 +103,8 @@ replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '/nr:true `')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/verbosity:minimal `', '/verbosity:normal `')
 // replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
 // replaceInFile(`${ROOT_PATH}/implementation/build/psakefile.ps1`, '$dbORCLdomain="adacta-fintech.com"', '$dbORCLdomain=""')
-replaceInFile(`${ROOT_PATH}/implementation/configuration.json`, '"targetLayer": "sava-si"', '"targetLayer": "sava-hr"')
-replaceInFile(`${ROOT_PATH}/implementation/configuration.json`, '"localCurrency": "EUR"', '"localCurrency": "HRK"')
+replaceInFile(`${ROOT_PATH}/implementation/configuration.json`, '"targetLayer": "sava-hr"', '"targetLayer": "sava-si"')
+replaceInFile(`${ROOT_PATH}/implementation/configuration.json`, '"localCurrency": "HRK"', '"localCurrency": "EUR"')
 
 let p = spawn('cmd.exe');
 
