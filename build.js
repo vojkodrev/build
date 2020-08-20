@@ -35,7 +35,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation\\.adi>`, command: `cd ../..` },
   
   { expect: `${ROOT_PATH}>`, command: `cd implementation/` },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run es-setup-hr`, successCheck: `successfully: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run es-setup-si`, successCheck: `successfully: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run resolve_translations`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
