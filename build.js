@@ -4,14 +4,14 @@ let executionPlan = [
 
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
-  { expect: `${ROOT_PATH}>`, command: `powershell` },
-  { expect: `PS ${ROOT_PATH}> `, command: 'iisreset /stop', successCheck: 'Internet services successfully stopped' },
-  { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `mv .\\configuration.json ..` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `git clean -fdx` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `git reset --hard`, successCheck: 'HEAD is now at' },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `mv ..\\configuration.json .` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
+  { expect: `${ROOT_PATH}>`, command: `powershell`, argv: "--clean" },
+  { expect: `PS ${ROOT_PATH}> `, command: 'iisreset /stop', successCheck: 'Internet services successfully stopped', argv: "--clean" },
+  { expect: `PS ${ROOT_PATH}> `, command: `cd implementation`, argv: "--clean" },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `mv .\\configuration.json ..`, argv: "--clean" },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `git clean -fdx`, argv: "--clean" },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `git reset --hard`, successCheck: 'HEAD is now at', argv: "--clean" },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `mv ..\\configuration.json .`, argv: "--clean" },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit`, argv: "--clean" },
 
   { expect: `${ROOT_PATH}>`, command: '"c:\\Program Files\\Git\\bin\\sh.exe" -c "find . -type d -name \\"node_modules\\" -exec rm -rf {} +"', errorCheck: `cannot remove` },
   
