@@ -42,6 +42,10 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
 
+  { expect: `${ROOT_PATH}\\implementation>`, command: `powershell` },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecuteScripts -EnvironmentTarget si -PostPublish`, successCheck: `Upgrade successful`, errorCheck: ['401 Unauthorized'] },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
+
   { expect: `${ROOT_PATH}\\implementation>`, command: `cd ..` },
 
   { expect: `${ROOT_PATH}>`, command: `cd mono\\client` },
