@@ -44,7 +44,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
 
   { expect: `${ROOT_PATH}\\implementation>`, command: `powershell` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecuteScripts -EnvironmentTarget hr -PostPublish`, successCheck: `Upgrade successful`, errorCheck: ['401 Unauthorized'] },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecuteScripts -EnvironmentTarget hr -PostPublish`, successCheck: ['Upgrade successful', 'No new scripts need to be executed - completing.'], errorCheck: ['401 Unauthorized'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
 
   { expect: `${ROOT_PATH}\\implementation>`, command: `cd ..` },
@@ -105,6 +105,27 @@ function failOnError(item, buffer) {
   }
 }
 
+function taskWasSuccessful(successCheck, buffer) { 
+  if (successCheck) {
+    if (Array.isArray(successCheck)) {
+
+      for (let item of successCheck) {
+        if (taskWasSuccessful(item, buffer)) {
+          return true;
+        }
+      }
+
+      return false;
+
+    } else {
+      return buffer.indexOf(successCheck.toUpperCase()) != -1
+    }
+  }
+
+  return true;
+
+}
+
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '/nr:true `')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/verbosity:minimal `', '/verbosity:normal `')
 // replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
@@ -140,7 +161,7 @@ p.stdout.on('data', (data) => {
 
   if (current && (!current.expect || buffer.endsWith(current.expect.toUpperCase()))) {
 
-    if (previous && previous.successCheck && buffer.indexOf(previous.successCheck.toUpperCase()) == -1) {
+    if (previous && !taskWasSuccessful(previous.successCheck, buffer)) {
       fail();
     } 
 
