@@ -7,7 +7,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}> `, command: 'iisreset /stop', successCheck: 'Internet services successfully stopped' },
   { expect: `PS ${ROOT_PATH}> `, command: 'cd implementation' },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git stash --include-untracked' },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git stash --include-untracked', errorCheck: 'No local changes to save' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'mv .\\configuration.json ..' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git clean -fdx' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git reset --hard', successCheck: 'HEAD is now at' },
@@ -49,7 +49,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation>`, command: `cd ..` },
 
   { expect: `${ROOT_PATH}>`, command: `cd mono\\client` },
-  { expect: `${ROOT_PATH}\\mono\\client>`, command: `yarn install`},
+  { expect: `${ROOT_PATH}\\mono\\client>`, command: `yarn install`, errorCheck: 'Failed to download'},
   { expect: `${ROOT_PATH}\\mono\\client>`, command: `yarn run start` },
   
 ];
