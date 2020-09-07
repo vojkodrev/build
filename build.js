@@ -126,6 +126,7 @@ function taskWasSuccessful(successCheck, buffer) {
 
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '/nr:true `')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/verbosity:minimal `', '/verbosity:normal `')
+replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"title": "HR - Localhost"', '"title": "SI - Localhost"')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"targetLayer": "sava-hr"', '"targetLayer": "sava-si"')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"localCurrency": "HRK"', '"localCurrency": "EUR"')
 
