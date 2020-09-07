@@ -8,10 +8,10 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}> `, command: 'iisreset /stop', successCheck: 'Internet services successfully stopped' },
   { expect: `PS ${ROOT_PATH}> `, command: 'cd implementation' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git stash --include-untracked', errorCheck: 'No local changes to save' },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'mv .\\configuration.json ..' },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'mv .\\.adi\\environments\\environment.local.json ..', errorCheck: ['Cannot find path'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git clean -fdx' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git reset --hard', successCheck: 'HEAD is now at' },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'mv ..\\configuration.json .' },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'mv ..\\environment.local.json .adi\\environments', errorCheck: ['Cannot find path'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git stash pop', errorCheck: 'conflict' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'exit' },
 
@@ -31,16 +31,15 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -BuildPrintouts -ExecuteScripts -EnvironmentTarget si`, successCheck: `Upgrade successful`, errorCheck: ['401 Unauthorized'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
   
-  { expect: `${ROOT_PATH}>`, command: `cd implementation\\.adi` },
-  { expect: `${ROOT_PATH}\\implementation\\.adi>`, command: `git clean -fdx` },
-  { expect: `${ROOT_PATH}\\implementation\\.adi>`, command: `cd ../..` },
-  
+  { expect: `${ROOT_PATH}>`, command: 'docker rm -f es' },
+  { expect: `${ROOT_PATH}>`, command: 'docker run -d -p 9200:9200 --name es registry.adacta-fintech.com/adinsure/platform/es' },
+
   { expect: `${ROOT_PATH}>`, command: `cd implementation/` },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run es-setup-si`, successCheck: `successfully: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
+  // { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run es-setup-si`, successCheck: `successfully: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run resolve_translations`, successCheck: `Done in ` },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
 
   { expect: `${ROOT_PATH}\\implementation>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecuteScripts -EnvironmentTarget si -PostPublish`, successCheck: ['Upgrade successful', 'No new scripts need to be executed - completing.'], errorCheck: ['401 Unauthorized', 'No new scripts need to be executed - completing'] },
@@ -127,10 +126,8 @@ function taskWasSuccessful(successCheck, buffer) {
 
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '/nr:true `')
 replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/verbosity:minimal `', '/verbosity:normal `')
-// replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'Start-Process cmd -ArgumentList "/C npm run server"', '# Start-Process cmd -ArgumentList "/C npm run server"')
-// replaceInFile(`${ROOT_PATH}/implementation/build/psakefile.ps1`, '$dbORCLdomain="adacta-fintech.com"', '$dbORCLdomain=""')
-replaceInFile(`${ROOT_PATH}/implementation/configuration.json`, '"targetLayer": "sava-hr"', '"targetLayer": "sava-si"')
-replaceInFile(`${ROOT_PATH}/implementation/configuration.json`, '"localCurrency": "HRK"', '"localCurrency": "EUR"')
+replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"targetLayer": "sava-hr"', '"targetLayer": "sava-si"')
+replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"localCurrency": "HRK"', '"localCurrency": "EUR"')
 
 let p = spawn('cmd.exe');
 
