@@ -28,7 +28,7 @@ let executionPlan = [
 
   { expect: `${ROOT_PATH}>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -BuildPrintouts -ExecuteScripts -EnvironmentTarget hr`, successCheck: `Upgrade successful`, errorCheck: ['401 Unauthorized'] },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -BuildPrintouts -ExecuteScripts -TargetLayer hr`, successCheck: `Upgrade successful`, errorCheck: ['401 Unauthorized'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ImportCSV`, successCheck: 'Done in ' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
   
@@ -43,7 +43,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
 
   { expect: `${ROOT_PATH}\\implementation>`, command: `powershell` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecuteScripts -EnvironmentTarget hr -PostPublish`, successCheck: ['Upgrade successful', 'No new scripts need to be executed - completing.'], errorCheck: ['401 Unauthorized', 'No new scripts need to be executed - completing'] },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecuteScripts -TargetLayer hr -PostPublish`, successCheck: ['Upgrade successful', 'No new scripts need to be executed - completing.'], errorCheck: ['401 Unauthorized', 'No new scripts need to be executed - completing'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
 
   { expect: `${ROOT_PATH}\\implementation>`, command: `cd ..` },
