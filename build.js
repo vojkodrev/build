@@ -28,7 +28,8 @@ let executionPlan = [
 
   { expect: `${ROOT_PATH}>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -BuildPrintouts -ExecuteScripts -TargetLayer hr`, successCheck: `Upgrade successful`, errorCheck: ['401 Unauthorized'] },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -ExecuteScripts -TargetLayer hr`, successCheck: `Upgrade successful`, errorCheck: ['401 Unauthorized'] },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `yarn install`, errorCheck: 'Failed to download'},
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ImportCSV`, successCheck: 'Done in ' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
   
