@@ -37,11 +37,10 @@ let executionPlan = [
   { expect: `${ROOT_PATH}>`, command: 'docker run -d -p 9200:9200 --name es registry.adacta-fintech.com/adinsure/platform/es' },
 
   { expect: `${ROOT_PATH}>`, command: `cd implementation/` },
-  // { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run es-setup-hr`, successCheck: `successfully: `, errorCheck: [`No Living connections`, `Error: No elasticsearch manifest configuration`, `TypeError: Cannot read property 'length' of undefined`] },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run resolve_translations`, successCheck: `Done in ` },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
+  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
 
   { expect: `${ROOT_PATH}\\implementation>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecuteScripts -TargetLayer hr -PostPublish`, successCheck: ['Upgrade successful', 'No new scripts need to be executed - completing.'], errorCheck: ['401 Unauthorized', 'No new scripts need to be executed - completing'] },
