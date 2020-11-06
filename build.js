@@ -7,7 +7,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}> `, command: 'iisreset /stop', successCheck: 'Internet services successfully stopped' },
   { expect: `PS ${ROOT_PATH}> `, command: 'cd implementation' },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git stash --include-untracked', errorCheck: 'No local changes to save' },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git stash --include-untracked', errorCheck: ['No local changes to save', 'Permission denied', 'Cannot save the untracked files'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'mv .\\.adi\\environments\\environment.local.json ..', errorCheck: ['Cannot find path'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git clean -fdx' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git reset --hard', successCheck: 'HEAD is now at' },
