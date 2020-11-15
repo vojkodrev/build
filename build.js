@@ -5,7 +5,6 @@ let executionPlan = [
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
   { expect: `${ROOT_PATH}>`, command: `powershell` },
-  { expect: `PS ${ROOT_PATH}> `, command: 'iisreset /stop', successCheck: 'Internet services successfully stopped' },
   { expect: `PS ${ROOT_PATH}> `, command: 'cd implementation' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git stash --include-untracked', errorCheck: ['No local changes to save', 'Permission denied', 'Cannot save the untracked files'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'mv .\\.adi\\environments\\environment.local.json ..', errorCheck: ['Cannot find path'] },
@@ -26,23 +25,45 @@ let executionPlan = [
 
   { expect: `${ROOT_PATH}\\mono>`, command: `cd ..` },
 
+  { expect: `${ROOT_PATH}>`, detached: true, commands: [
+    { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
+    { expect: `${ROOT_PATH}>`, command: `powershell` },
+    { expect: `PS ${ROOT_PATH}> `, command: `cd mono` },
+    { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -RunIS`, successCheck: `Enter 'Q' to stop IIS Express` },
+  ] },
+
+  { expect: `${ROOT_PATH}>`, detached: true, commands: [
+    { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
+    { expect: `${ROOT_PATH}>`, command: `powershell` },
+    { expect: `PS ${ROOT_PATH}> `, command: `cd mono` },
+    { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -RunServer`, successCheck: `AdInsure is initialized and ready to use.` },
+  ] },
+
   { expect: `${ROOT_PATH}>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -ExecuteScripts -TargetLayer si`, successCheck: `Upgrade successful`, errorCheck: ['401 Unauthorized'] },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -ExecuteScripts -TargetLayer si`, successCheck: [`Upgrade successful`, `0 Error(s)`], errorCheck: ['401 Unauthorized'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `yarn install`, errorCheck: 'Failed to download'},
+  // { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ImportCSV`, successCheck: 'Done in ' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
-  
+
   { expect: `${ROOT_PATH}>`, command: 'docker rm -f es' },
-  { expect: `${ROOT_PATH}>`, command: 'docker run -d -p 9200:9200 --name es registry.adacta-fintech.com/adinsure/platform/es' },
+  // { expect: `${ROOT_PATH}>`, command: 'docker run -d -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0' },
+
+  { expect: `${ROOT_PATH}>`, detached: true, commands: [
+    { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
+    { expect: `${ROOT_PATH}>`, command: `powershell` },
+    { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
+    { expect: `PS ${ROOT_PATH}\\implementation> `, command: `docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0`, successCheck: `Active license is now [BASIC]; Security is disabled` },
+  ] },
 
   { expect: `${ROOT_PATH}>`, command: `cd implementation/` },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run resolve_translations`, successCheck: `Done in ` },
+  // { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
+  // { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run resolve_translations`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
 
   // { expect: `${ROOT_PATH}\\implementation>`, command: `powershell` },
-  // { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecuteScripts -EnvironmentTarget si -PostPublish`, successCheck: ['Upgrade successful', 'No new scripts need to be executed - completing.'], errorCheck: ['401 Unauthorized', 'No new scripts need to be executed - completing'] },
+  // { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecuteScripts -TargetLayer si -PostPublish`, successCheck: ['Upgrade successful', 'No new scripts need to be executed - completing.'], errorCheck: ['401 Unauthorized', 'No new scripts need to be executed - completing'] },
   // { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
 
   { expect: `${ROOT_PATH}\\implementation>`, command: `cd ..` },
@@ -124,63 +145,74 @@ function taskWasSuccessful(successCheck, buffer) {
 
 }
 
-replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/nr:false `', '/nr:true `')
-replaceInFile(`${ROOT_PATH}/mono/build.ps1`, '/verbosity:minimal `', '/verbosity:normal `')
+function runExecutionPlan(executionPlan, callback) {
+  let p = spawn('cmd.exe');
+
+  let state = 0;
+  let buffer = "";
+  let errorBuffer = "";
+  
+  p.stderr.on('data', (data) => {
+    errorBuffer += data.toString("utf-8").toUpperCase();
+    process.stderr.write(data);
+  
+    let previous = executionPlan[state - 1];
+  
+    failOnError(previous, errorBuffer);
+  });
+  
+  p.stdout.on('data', async (data) => {
+    
+    buffer += data.toString("utf-8").toUpperCase();
+  
+    process.stdout.write(data);
+  
+    let current = executionPlan[state];
+    let previous = executionPlan[state - 1];
+  
+    failOnError(previous, buffer);
+  
+    if (!current && executionPlan.indexOf(previous) == executionPlan.length - 1 && previous && previous.successCheck && taskWasSuccessful(previous.successCheck, buffer)) {
+      callback()
+    }
+    else if (current && (!current.expect || buffer.endsWith(current.expect.toUpperCase()))) {
+  
+      if (previous && !taskWasSuccessful(previous.successCheck, buffer)) {
+        fail();
+      } 
+  
+      buffer = "";
+      errorBuffer = "";
+  
+      while (true) {
+        current = executionPlan[state];
+  
+        if (!current) {
+          break;
+        }
+  
+        state++;
+  
+        if (!current.argv || process.argv.filter(i => i == current.argv).length > 0) {
+          if (current.detached) {
+
+            let runExecutionPlanPromisify = require("util").promisify(runExecutionPlan)
+            await runExecutionPlanPromisify(current.commands)
+          } else {
+            p.stdin.write(current.command + "\n");
+            break;
+          }
+        }
+      }
+    }
+  
+  });
+}
+
+replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'dotnet build "$root\\AdInsure.sln" --configuration $buildConfiguration\r\n', 'dotnet build "$root\\AdInsure.sln" --configuration $buildConfiguration -v n\r\n')
+replaceInFile(`${ROOT_PATH}/implementation/build.ps1`, 'dotnet build "plugins/Server.Plugins.$pluginsTargetlayer.sln" --configuration $buildConfiguration\r\n', 'dotnet build "plugins/Server.Plugins.$pluginsTargetlayer.sln" --configuration $buildConfiguration -v n\r\n')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"title": "HR - Localhost"', '"title": "SI - Localhost"')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"targetLayer": "sava-hr"', '"targetLayer": "sava-si"')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"localCurrency": "HRK"', '"localCurrency": "EUR"')
 
-let p = spawn('cmd.exe');
-
-let state = 0;
-let buffer = "";
-let errorBuffer = "";
-
-p.stderr.on('data', (data) => {
-  errorBuffer += data.toString("utf-8").toUpperCase();
-  process.stderr.write(data);
-
-  let previous = executionPlan[state - 1];
-
-  failOnError(previous, errorBuffer);
-});
-
-p.stdout.on('data', (data) => {
-  
-  buffer += data.toString("utf-8").toUpperCase();
-
-  process.stdout.write(data);
-
-  let current = executionPlan[state];
-  let previous = executionPlan[state - 1];
-
-  failOnError(previous, buffer);
-
-  if (current && (!current.expect || buffer.endsWith(current.expect.toUpperCase()))) {
-
-    if (previous && !taskWasSuccessful(previous.successCheck, buffer)) {
-      fail();
-    } 
-
-    buffer = "";
-    errorBuffer = "";
-
-    while (true) {
-      current = executionPlan[state];
-
-      if (!current) {
-        break;
-      }
-
-      state++;
-
-      if (!current.argv || process.argv.filter(i => i == current.argv).length > 0) {
-        p.stdin.write(current.command + "\n");
-        break;
-      }
-    }
-  }
-
-});
-
-
+runExecutionPlan(executionPlan)
