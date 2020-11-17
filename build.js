@@ -47,11 +47,17 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
 
   { expect: `${ROOT_PATH}>`, command: 'docker rm -f es' },
-  { expect: `${ROOT_PATH}>`, command: 'docker run -d -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0' },
+
+  { expect: `${ROOT_PATH}>`, detached: true, commands: [
+    { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
+    { expect: `${ROOT_PATH}>`, command: `powershell` },
+    { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
+    { expect: `PS ${ROOT_PATH}\\implementation> `, command: `docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0`, successCheck: `Active license is now [BASIC]; Security is disabled` },
+  ] },
 
   { expect: `${ROOT_PATH}>`, command: `cd implementation/` },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
-  { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run resolve_translations`, successCheck: `Done in ` },
+  // { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
+  // { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run resolve_translations`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
 
@@ -165,7 +171,7 @@ function runExecutionPlan(executionPlan, callback) {
   
     failOnError(previous, buffer);
   
-    if (!current && executionPlan.indexOf(previous) == executionPlan.length - 1 && previous.successCheck && taskWasSuccessful(previous.successCheck, buffer)) {
+    if (!current && executionPlan.indexOf(previous) == executionPlan.length - 1 && previous && previous.successCheck && taskWasSuccessful(previous.successCheck, buffer)) {
       callback()
     }
     else if (current && (!current.expect || buffer.endsWith(current.expect.toUpperCase()))) {
