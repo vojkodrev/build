@@ -47,7 +47,6 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
 
   { expect: `${ROOT_PATH}>`, command: 'docker rm -f es' },
-  // { expect: `${ROOT_PATH}>`, command: 'docker run -d -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0' },
 
   { expect: `${ROOT_PATH}>`, detached: true, commands: [
     { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
