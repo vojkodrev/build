@@ -5,6 +5,9 @@ let executionPlan = [
   { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
 
   { expect: `${ROOT_PATH}>`, command: `powershell` },
+
+  { expect: `PS ${ROOT_PATH}> `, command: 'docker rm -f es' },
+
   { expect: `PS ${ROOT_PATH}> `, command: 'cd implementation' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git stash --include-untracked', errorCheck: ['No local changes to save', 'Permission denied', 'Cannot save the untracked files'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'mv .\\.adi\\environments\\environment.local.json ..', errorCheck: ['Cannot find path'] },
@@ -46,13 +49,11 @@ let executionPlan = [
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ImportCSV`, successCheck: 'Done in ' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
 
-  { expect: `${ROOT_PATH}>`, command: 'docker rm -f es' },
-
   { expect: `${ROOT_PATH}>`, detached: true, commands: [
     { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
     { expect: `${ROOT_PATH}>`, command: `powershell` },
     { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
-    { expect: `PS ${ROOT_PATH}\\implementation> `, command: `docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0`, successCheck: `Active license is now [BASIC]; Security is disabled` },
+    { expect: `PS ${ROOT_PATH}\\implementation> `, command: `docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0`, successCheck: `Active license is now [BASIC]; Security is disabled`, errorCheck: 'failed to shutdown container:' },
   ] },
 
   { expect: `${ROOT_PATH}>`, command: `cd implementation/` },
