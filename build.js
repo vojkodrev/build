@@ -209,8 +209,8 @@ function runExecutionPlan(executionPlan, callback) {
   });
 }
 
-replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'dotnet build "$root\\AdInsure.sln" --configuration $buildConfiguration\r\n', 'dotnet build "$root\\AdInsure.sln" --configuration $buildConfiguration -v n\r\n')
-replaceInFile(`${ROOT_PATH}/implementation/build.ps1`, 'dotnet build "plugins/Server.Plugins.$pluginsTargetlayer.sln" --configuration $buildConfiguration\r\n', 'dotnet build "plugins/Server.Plugins.$pluginsTargetlayer.sln" --configuration $buildConfiguration -v n\r\n')
+replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'dotnet build "$root\\AdInsure.sln" --configuration $buildConfiguration', 'dotnet build "$root\\AdInsure.sln" --configuration $buildConfiguration -v n')
+replaceInFile(`${ROOT_PATH}/implementation/build.ps1`, 'dotnet build "plugins/Server.Plugins.$pluginsTargetlayer.sln" -c Debug -o $binDir', 'dotnet build "plugins/Server.Plugins.$pluginsTargetlayer.sln" -c Debug -o $binDir -v n')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"title": "SI - Localhost"', '"title": "HR - Localhost"')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"targetLayer": "sava-si"', '"targetLayer": "sava-hr"')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"localCurrency": "EUR"', '"localCurrency": "HRK"')
