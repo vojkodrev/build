@@ -7,6 +7,13 @@ let executionPlan = [
   { expect: `${ROOT_PATH}>`, command: `powershell` },
 
   { expect: `PS ${ROOT_PATH}> `, command: 'docker rm -f es' },
+  
+  { expect: `PS ${ROOT_PATH}> `, detached: true, commands: [
+    { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
+    { expect: `${ROOT_PATH}>`, command: `powershell` },
+    { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
+    { expect: `PS ${ROOT_PATH}\\implementation> `, command: `docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0`, successCheck: `Active license is now [BASIC]; Security is disabled`, errorCheck: 'failed to shutdown container:' },
+  ] },
 
   { expect: `PS ${ROOT_PATH}> `, command: 'cd implementation' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: 'git stash --include-untracked', errorCheck: ['No local changes to save', 'Permission denied', 'Cannot save the untracked files'] },
@@ -45,20 +52,11 @@ let executionPlan = [
   { expect: `${ROOT_PATH}>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -ExecuteScripts -TargetLayer si`, successCheck: [`Upgrade successful`, `0 Error(s)`], errorCheck: ['401 Unauthorized'] },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `yarn install`, errorCheck: 'Failed to download'},
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `yarn install`, errorCheck: ['Failed to download', 'Error:']},
   // { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ImportCSV`, successCheck: 'Done in ' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
 
-  { expect: `${ROOT_PATH}>`, detached: true, commands: [
-    { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
-    { expect: `${ROOT_PATH}>`, command: `powershell` },
-    { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
-    { expect: `PS ${ROOT_PATH}\\implementation> `, command: `docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0`, successCheck: `Active license is now [BASIC]; Security is disabled`, errorCheck: 'failed to shutdown container:' },
-  ] },
-
   { expect: `${ROOT_PATH}>`, command: `cd implementation/` },
-  // { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run translate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
-  // { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run resolve_translations`, successCheck: `Done in ` },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
 
