@@ -61,7 +61,7 @@ let executionPlan = [
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run publish-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
 
   { expect: `${ROOT_PATH}\\implementation>`, command: `powershell` },
-  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecuteScripts -TargetLayer hr -PostPublish`, successCheck: ['Upgrade successful', 'No new scripts need to be executed - completing.'], errorCheck: ['401 Unauthorized', 'No new scripts need to be executed - completing'] },
+  { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ExecutePostPublishScripts -TargetLayer hr`, successCheck: ['Upgrade successful', 'No new scripts need to be executed - completing.'], errorCheck: ['401 Unauthorized', 'No new scripts need to be executed - completing'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
 
   { expect: `${ROOT_PATH}\\implementation>`, command: `cd ..` },
