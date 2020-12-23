@@ -42,19 +42,19 @@ let executionPlan = [
     { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -RunIS`, successCheck: `Enter 'Q' to stop IIS Express` },
   ] },
 
-  { expect: `${ROOT_PATH}>`, detached: true, commands: [
-    { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
-    { expect: `${ROOT_PATH}>`, command: `powershell` },
-    { expect: `PS ${ROOT_PATH}> `, command: `cd mono` },
-    { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -RunServer`, successCheck: `AdInsure is initialized and ready to use.` },
-  ] },
-
   { expect: `${ROOT_PATH}>`, command: `powershell` },
   { expect: `PS ${ROOT_PATH}> `, command: `cd implementation` },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -Build -ExecuteScripts -TargetLayer hr`, successCheck: [`Upgrade successful`, `0 Error(s)`], errorCheck: ['401 Unauthorized'] },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `yarn install`, errorCheck: ['Failed to download', 'Error:']},
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `.\\build.ps1 -ImportCSV`, successCheck: 'Done in ' },
   { expect: `PS ${ROOT_PATH}\\implementation> `, command: `exit` },
+
+  { expect: `${ROOT_PATH}>`, detached: true, commands: [
+    { expect: process.cwd() + `>`, command: `cd ${ROOT_PATH}` },
+    { expect: `${ROOT_PATH}>`, command: `powershell` },
+    { expect: `PS ${ROOT_PATH}> `, command: `cd mono` },
+    { expect: `PS ${ROOT_PATH}\\Mono> `, command: `.\\build.ps1 -RunServer`, successCheck: `AdInsure is initialized and ready to use.` },
+  ] },
 
   { expect: `${ROOT_PATH}>`, command: `cd implementation/` },
   { expect: `${ROOT_PATH}\\implementation>`, command: `yarn run validate-workspace -e environment.local.json`, successCheck: `Done in `, errorCheck: [`[ERROR]`] },
@@ -207,8 +207,8 @@ function runExecutionPlan(executionPlan, callback) {
   });
 }
 
-replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'dotnet build "$root\\AdInsure.sln" --configuration $buildConfiguration', 'dotnet build "$root\\AdInsure.sln" --configuration $buildConfiguration -v n')
-replaceInFile(`${ROOT_PATH}/implementation/build.ps1`, 'dotnet build "plugins/Server.Plugins.$pluginsTargetlayer.sln" -c Debug -o $binDir', 'dotnet build "plugins/Server.Plugins.$pluginsTargetlayer.sln" -c Debug -o $binDir -v n')
+replaceInFile(`${ROOT_PATH}/mono/build.ps1`, 'dotnet build "$root\\AdInsure.sln" --configuration $buildConfiguration', 'dotnet build "$root\\AdInsure.sln" --configuration $buildConfiguration -v n /nr:true')
+replaceInFile(`${ROOT_PATH}/implementation/build.ps1`, 'dotnet build "plugins/Server.Plugins.$pluginsTargetlayer.sln" -c Debug -o $binDir', 'dotnet build "plugins/Server.Plugins.$pluginsTargetlayer.sln" -c Debug -o $binDir -v n /nr:true')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"title": "SI - Localhost"', '"title": "HR - Localhost"')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"targetLayer": "sava-si"', '"targetLayer": "sava-hr"')
 replaceInFile(`${ROOT_PATH}/implementation/.adi/environments/environment.local.json`, '"localCurrency": "EUR"', '"localCurrency": "HRK"')
