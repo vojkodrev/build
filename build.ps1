@@ -43,33 +43,83 @@ function Run-Command-Stop-On-Error {
 }
 
 function Start-ES-Docker-In-Background {
+  param(
+    [parameter(Mandatory=$true)]
+    [ScriptBlock]$InitializationScript
+  )
   
   do {
     Run-Command "docker rm -f es"
 
     $retry = $false
 
-    $startESJob = Start-Job -InitializationScript $sharedFunctions -ScriptBlock {
+    $job = Start-Job -InitializationScript $InitializationScript -ScriptBlock {
       Run-Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0'
     }   
 
     while ($true) {
 
-      Receive-Job $startESJob -OutVariable jOut -ErrorVariable jError
+      Receive-Job $job -OutVariable jOut -ErrorVariable jError
 
       if ($jError -match ".*?failure in a Windows system call: The virtual machine or container with the specified identifier is not running*?") {
         $retry = $true
       }
 
-      if ($startESJob.JobStateInfo.State -eq "Completed") {
+      if ($job.JobStateInfo.State -eq "Completed") {
         break
       }
 
-      if ($jOut -match ".*?Active license is now \[BASIC\]; Security is disabled\.*?") {
+      if ($jOut -match ".*?Active license is now \[BASIC\]; Security is disabled.*?") {
         break
       }
     }
   } while ($retry)
+}
+
+function Start-Server-In-Background {
+  param(
+    [parameter(Mandatory=$true)]
+    [ScriptBlock]$InitializationScript,
+
+    [parameter(Mandatory=$true)]
+    [string]$Dir,
+
+    [parameter(Mandatory=$true)]
+    [string]$Command,
+
+    [parameter(Mandatory=$true)]
+    [string]$SuccessCheck
+  )
+  
+  $job = Start-Job -InitializationScript $InitializationScript -ArgumentList $Dir,$Command -ScriptBlock {
+    param(
+      [parameter(Mandatory=$true)]
+      [string]$Dir,
+
+      [parameter(Mandatory=$true)]
+      [string]$Command
+    )
+
+    Set-Location $Dir
+    Run-Command $Command
+  }
+
+  while ($true) {
+
+    Receive-Job $job -OutVariable jOut -ErrorVariable jError
+
+    if ($job.JobStateInfo.State -eq "Failed") {
+      Write-Error "FAILED!" -ErrorAction Stop
+    }
+
+    if ($job.JobStateInfo.State -eq "Completed") {
+      break
+    }
+
+    if ($jOut -match $SuccessCheck) {
+      break
+    }
+  }
 }
 
 function Remove-Node-Modules {
@@ -91,9 +141,10 @@ if (!(Test-Path $Root)) {
 
 $implementationDir = [io.path]::combine($Root, "implementation")
 $monoDir = [io.path]::combine($Root, "mono")
+$monoClientDir = [io.path]::combine($monoDir, "client")
 
-if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir)) {
-  Write-Error "Wrong directory structure in $Root mono and implementation dirs expected!" -ErrorAction Stop
+if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $monoClientDir)) {
+  Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
 }
 
 try {
@@ -101,7 +152,7 @@ try {
   Push-Location
   Set-Location $Root
 
-  Start-ES-Docker-In-Background
+  Start-ES-Docker-In-Background -InitializationScript $sharedFunctions
 
   Remove-Node-Modules
   
@@ -154,9 +205,43 @@ try {
       Run-Command-Stop-On-Error ".\build.ps1 -ImportCSV"
     }
 
+    Start-Server-In-Background `
+      -Command ".\build.ps1 -RunIS" `
+      -SuccessCheck ".*?IIS Express is running\..*?" `
+      -Dir $monoDir `
+      -InitializationScript $sharedFunctions 
+
+    Start-Server-In-Background `
+      -Command ".\build.ps1 -RunServer" `
+      -SuccessCheck ".*?AdInsure is initialized and ready to use\..*?" `
+      -Dir $monoDir `
+      -InitializationScript $sharedFunctions
+
+    Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.json"
+    Run-Command-Stop-On-Error "yarn run publish-workspace -e environment.local.json"
+
+    Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
+
   } finally {
     Pop-Location  
   }
+
+  try {
+
+    Push-Location
+    Set-Location .\mono\client
+
+    Run-Command-Stop-On-Error "yarn install"
+    
+    Start-Server-In-Background `
+      -Command "yarn run start" `
+      -SuccessCheck ".*?Compiled successfully\..*?" `
+      -Dir $monoClientDir `
+      -InitializationScript $sharedFunctions
+    
+  } finally {
+    Pop-Location  
+  }  
 
 } finally {
   Pop-Location  
