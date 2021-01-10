@@ -45,12 +45,12 @@ function Run-Command-Stop-On-Error {
 function Start-ES-Docker-In-Background {
   
   do {
-    Run-Command -Description "Removing ES docker container" "docker rm -f es"
+    Run-Command "docker rm -f es"
 
     $retry = $false
 
     $startESJob = Start-Job -InitializationScript $sharedFunctions -ScriptBlock {
-      Run-Command -Description "Starting ES docker" 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0'
+      Run-Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0'
     }   
 
     while ($true) {
