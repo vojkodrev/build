@@ -143,7 +143,7 @@ try {
     -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0' `
     -Retry $true `
     -SuccessCheck ".*?Active license is now \[BASIC\]; Security is disabled.*?" `
-    -ErrorCheck ".*?failure in a Windows system call: The virtual machine or container with the specified identifier is not running*?"
+    -ErrorCheck ".*?failure in a Windows system call: The virtual machine or container with the specified identifier is not running.*?"
 
   Remove-Node-Modules
   
