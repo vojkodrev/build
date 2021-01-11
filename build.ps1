@@ -42,84 +42,69 @@ function Run-Command-Stop-On-Error {
   }
 }
 
-function Start-ES-Docker-In-Background {
+function Start-Server-In-Background {
   param(
     [parameter(Mandatory=$true)]
-    [ScriptBlock]$InitializationScript
+    [ScriptBlock]$InitializationScript,
+
+    [string]$Dir,
+
+    [parameter(Mandatory=$true)]
+    [string]$Command,
+
+    [string]$CleanUpCommand,
+
+    [parameter(Mandatory=$true)]
+    [string]$SuccessCheck,
+
+    [string]$ErrorCheck,
+
+    [bool]$Retry
   )
-  
+
   do {
-    Run-Command "docker rm -f es"
+    if ($CleanUpCommand) {
+      Run-Command $CleanUpCommand
+    }
 
-    $retry = $false
+    $runAgain = $false
 
-    $job = Start-Job -InitializationScript $InitializationScript -ScriptBlock {
-      Run-Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0'
-    }   
+    $job = Start-Job -InitializationScript $InitializationScript -ArgumentList $Dir,$Command -ScriptBlock {
+      param(
+        [string]$Dir,
+  
+        [parameter(Mandatory=$true)]
+        [string]$Command
+      )
+  
+      if ($Dir) {
+        Set-Location $Dir
+      }
+      
+      Run-Command $Command
+    }
 
     while ($true) {
 
       Receive-Job $job -OutVariable jOut -ErrorVariable jError
 
-      if ($jError -match ".*?failure in a Windows system call: The virtual machine or container with the specified identifier is not running*?") {
-        $retry = $true
+      if ($job.JobStateInfo.State -eq "Failed" -or $ErrorCheck -and $jError -match $ErrorCheck) {
+        if ($Retry) {
+          $runAgain = $true
+        } else {
+          Write-Error "FAILED!" -ErrorAction Stop
+        }
       }
 
       if ($job.JobStateInfo.State -eq "Completed") {
         break
       }
 
-      if ($jOut -match ".*?Active license is now \[BASIC\]; Security is disabled.*?") {
+      if ($jOut -match $SuccessCheck) {
         break
       }
     }
-  } while ($retry)
-}
-
-function Start-Server-In-Background {
-  param(
-    [parameter(Mandatory=$true)]
-    [ScriptBlock]$InitializationScript,
-
-    [parameter(Mandatory=$true)]
-    [string]$Dir,
-
-    [parameter(Mandatory=$true)]
-    [string]$Command,
-
-    [parameter(Mandatory=$true)]
-    [string]$SuccessCheck
-  )
-  
-  $job = Start-Job -InitializationScript $InitializationScript -ArgumentList $Dir,$Command -ScriptBlock {
-    param(
-      [parameter(Mandatory=$true)]
-      [string]$Dir,
-
-      [parameter(Mandatory=$true)]
-      [string]$Command
-    )
-
-    Set-Location $Dir
-    Run-Command $Command
-  }
-
-  while ($true) {
-
-    Receive-Job $job -OutVariable jOut -ErrorVariable jError
-
-    if ($job.JobStateInfo.State -eq "Failed") {
-      Write-Error "FAILED!" -ErrorAction Stop
-    }
-
-    if ($job.JobStateInfo.State -eq "Completed") {
-      break
-    }
-
-    if ($jOut -match $SuccessCheck) {
-      break
-    }
-  }
+  } while ($runAgain)
 }
 
 function Remove-Node-Modules {
@@ -152,7 +137,13 @@ try {
   Push-Location
   Set-Location $Root
 
-  Start-ES-Docker-In-Background -InitializationScript $sharedFunctions
+  Start-Server-In-Background `
+    -InitializationScript $sharedFunctions `
+    -CleanUpCommand "docker rm -f es" `
+    -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0' `
+    -Retry $true `
+    -SuccessCheck ".*?Active license is now \[BASIC\]; Security is disabled.*?" `
+    -ErrorCheck ".*?failure in a Windows system call: The virtual machine or container with the specified identifier is not running*?"
 
   Remove-Node-Modules
   
