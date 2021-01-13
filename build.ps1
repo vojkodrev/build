@@ -211,7 +211,9 @@ try {
     Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.json"
     Run-Command-Stop-On-Error "yarn run publish-workspace -e environment.local.json"
 
-    Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
+    if ($Layer -like "HR") {
+      Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
+    }
 
   } finally {
     Pop-Location  
