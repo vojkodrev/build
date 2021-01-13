@@ -1,7 +1,8 @@
 
 param(
   [string]$Root = "c:\code\sava",
-  [string]$Layer = "hr"
+  [string]$Layer = "hr",
+  [switch]$Clean
 )
 
 $sharedFunctions = {
@@ -117,8 +118,8 @@ function Remove-Node-Modules {
   }
 }
 
-Write-Host "Root:" $Root
-Write-Host "Layer:" $Layer
+# Write-Host "Root:" $Root
+# Write-Host "Layer:" $Layer
 
 if (!(Test-Path $Root)) {
   Write-Error "Directory $Root does not exist!" -ErrorAction Stop
@@ -145,31 +146,33 @@ try {
     -SuccessCheck ".*?Active license is now \[BASIC\]; Security is disabled.*?" `
     -ErrorCheck ".*?failure in a Windows system call: The virtual machine or container with the specified identifier is not running.*?"
 
-  Remove-Node-Modules
-  
-  try {
-
-    Push-Location
-    Set-Location .\implementation
+  if ($Clean) {
+    Remove-Node-Modules
 
     try {
-      Run-Command-Stop-On-Error "Move-Item -Path .adi\environments\environment.local.json -Destination .. -Force"
 
-      Run-Command "git stash --include-untracked"
-      $stashExitCode = $LASTEXITCODE
-  
-      Run-Command "echo no | git clean -fdx"
-      Run-Command "git reset --hard"
-  
-      if ($stashExitCode -eq 0) {
-        Run-Command-Stop-On-Error "git stash pop"
+      Push-Location
+      Set-Location .\implementation
+
+      try {
+        Run-Command-Stop-On-Error "Move-Item -Path .adi\environments\environment.local.json -Destination .. -Force"
+
+        Run-Command "git stash --include-untracked"
+        $stashExitCode = $LASTEXITCODE
+    
+        Run-Command "echo no | git clean -fdx"
+        Run-Command "git reset --hard"
+    
+        if ($stashExitCode -eq 0) {
+          Run-Command-Stop-On-Error "git stash pop"
+        }
+      } finally {
+        Run-Command-Stop-On-Error "Move-Item -Destination .adi\environments -Path ..\environment.local.json -Force"
       }
-    } finally {
-      Run-Command-Stop-On-Error "Move-Item -Destination .adi\environments -Path ..\environment.local.json -Force"
-    }
 
-  } finally {
-    Pop-Location  
+    } finally {
+      Pop-Location  
+    }
   }
 
   try {
