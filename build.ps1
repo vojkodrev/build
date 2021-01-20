@@ -118,8 +118,28 @@ function Remove-Node-Modules {
   }
 }
 
-# Write-Host "Root:" $Root
-# Write-Host "Layer:" $Layer
+function Find-And-Stop-Process {
+  param(
+    [parameter(Mandatory=$true)]
+    [string]$ProcessName,
+
+    [parameter(Mandatory=$true)]
+    [string]$Command
+  )
+
+  Get-WmiObject Win32_Process -Filter "name = '$ProcessName'" | ForEach-Object {
+    $process = $_
+    $commandLine = Select-Object -InputObject $process "CommandLine"
+    $processId = Select-Object -InputObject $process "ProcessId"
+
+    # Write-Host $commandLine.CommandLine
+
+    if ($commandLine.CommandLine -match $Command) {
+      Write-Host "Stopping" $commandLine.CommandLine
+      Stop-Process $processId.ProcessId
+    }
+  }
+}
 
 if (!(Test-Path $Root)) {
   Write-Error "Directory $Root does not exist!" -ErrorAction Stop
@@ -132,6 +152,22 @@ $monoClientDir = [io.path]::combine($monoDir, "client")
 if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $monoClientDir)) {
   Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
 }
+
+Find-And-Stop-Process `
+  -ProcessName "AdInsure.Server.exe" `
+  -Command 'AdInsure\.Server\.exe.*?run --urls http://\*:60000'  
+
+Find-And-Stop-Process `
+  -ProcessName "docker.exe" `
+  -Command 'docker\.exe.*?run -p 9200:9200 -m 4g -e discovery\.type=single-node --name es elasticsearch:7\.9\.0'
+
+Find-And-Stop-Process `
+  -ProcessName "node.exe" `
+  -Command 'node\.exe.*?@angular\\cli\\bin\\ng.*?serve'
+
+Find-And-Stop-Process `
+  -ProcessName "iisexpress.exe" `
+  -Command 'iisexpress\.exe.*?/path:.*?AdInsure\.IdentityServer /port:60001'
 
 try {
 
