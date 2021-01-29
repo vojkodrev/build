@@ -60,7 +60,7 @@ function Start-Server-In-Background {
 
     [string]$ErrorCheck,
 
-    [bool]$Retry
+    [switch]$Retry
   )
 
   do {
@@ -178,7 +178,7 @@ try {
     -InitializationScript $sharedFunctions `
     -CleanUpCommand "docker rm -f es" `
     -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0' `
-    -Retry $true `
+    -Retry `
     -SuccessCheck ".*?Active license is now \[BASIC\]; Security is disabled.*?" `
     -ErrorCheck ".*?failure in a Windows system call: The virtual machine or container with the specified identifier is not running.*?"
 
