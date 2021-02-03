@@ -193,13 +193,12 @@ try {
       try {
         Run-Command-Stop-On-Error "Move-Item -Path .adi\environments\environment.local.json -Destination .. -Force"
 
-        Run-Command "git stash --include-untracked"
-        $stashExitCode = $LASTEXITCODE
+        $gitStashOutput = Run-Command "git stash --include-untracked"
     
         Run-Command "echo no | git clean -fdx"
         Run-Command "git reset --hard"
     
-        if ($stashExitCode -eq 0) {
+        if ($gitStashOutput -notmatch ".*?No local changes to save") {
           Run-Command-Stop-On-Error "git stash pop"
         }
       } finally {
