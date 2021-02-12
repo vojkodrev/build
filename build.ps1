@@ -153,6 +153,21 @@ if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $m
   Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
 }
 
+try {
+
+  Push-Location
+  Set-Location $monoDir
+
+  $requiredPlatformVersion = Get-Content ([io.path]::combine($implementationDir, "PLATFORM_VERSION"))
+  $correctTag = git tag --points-at HEAD | Select-String $requiredPlatformVersion
+  if (-not $correctTag) {
+    Write-Error "Mono $requiredPlatformVersion is required" -ErrorAction Stop
+  }
+
+} finally {
+  Pop-Location  
+}
+
 Find-And-Stop-Process `
   -ProcessName "AdInsure.Server.exe" `
   -Command 'AdInsure\.Server\.exe.*?run --urls http://\*:60000'  
@@ -247,7 +262,12 @@ try {
       -InitializationScript $sharedFunctions
 
     Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.json"
-    Run-Command-Stop-On-Error "yarn run publish-workspace -e environment.local.json"
+
+    $runAgain = $false
+    do {
+      Run-Command "yarn run publish-workspace -e environment.local.json"
+      $runAgain = ($LASTEXITCODE -ne 0)
+    } while ($runAgain)
 
     if ($Layer -like "HR") {
       Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
