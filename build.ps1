@@ -1,7 +1,12 @@
 
 param(
-  [string]$Root = "c:\code\sava",
-  [string]$Layer = "hr",
+  [string]
+  $Root = "c:\code\sava",
+  
+  [ValidateSet("hr", "si")]
+  [string]
+  $Layer = "hr",
+  
   [switch]$Clean
 )
 
@@ -148,9 +153,15 @@ if (!(Test-Path $Root)) {
 $implementationDir = [io.path]::combine($Root, "implementation")
 $monoDir = [io.path]::combine($Root, "mono")
 $monoClientDir = [io.path]::combine($monoDir, "client")
+$adiEnvDir = [io.path]::combine($implementationDir, ".adi", "environments")
+$envLocalJsonFilename = [io.path]::combine($adiEnvDir, "environment.local.json")
 
 if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $monoClientDir)) {
   Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
+}
+
+if (!(Test-Path $envLocalJsonFilename)) {
+  Write-Error "Missing $envLocalJsonFilename" -ErrorAction Stop
 }
 
 try {
@@ -166,6 +177,30 @@ try {
 
 } finally {
   Pop-Location  
+}
+
+
+$parsedEnvLocalJson = ConvertFrom-Json ([IO.File]::ReadAllText($envLocalJsonFilename))
+
+$requiredJsonTargetlayer = $null
+$requiredJsonCurrency = $null
+
+if ($Layer -eq "si") {
+  $requiredJsonTargetlayer = "sava-si"
+  $requiredJsonCurrency = "EUR"
+} elseif ($Layer -eq "hr") {
+  $requiredJsonTargetlayer = "sava-hr"
+  $requiredJsonCurrency = "HRK"
+} else {
+  Write-Error "Unsupported layer $Layer during $([io.path]::GetFileName($envLocalJsonFilename)) validation" -ErrorAction Stop
+}
+
+if ($parsedEnvLocalJson.targetLayer -ne $requiredJsonTargetlayer) {
+  Write-Error "Target layer must be $requiredJsonTargetlayer in $([io.path]::GetFileName($envLocalJsonFilename))" -ErrorAction Stop
+}
+
+if ($parsedEnvLocalJson.localCurrency -ne $requiredJsonCurrency) {
+  Write-Error "Currency must be $requiredJsonCurrency in $([io.path]::GetFileName($envLocalJsonFilename))" -ErrorAction Stop
 }
 
 Find-And-Stop-Process `
