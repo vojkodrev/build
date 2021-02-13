@@ -169,7 +169,7 @@ try {
   Push-Location
   Set-Location $monoDir
 
-  $requiredPlatformVersion = Get-Content ([io.path]::combine($implementationDir, "PLATFORM_VERSION"))
+  $requiredPlatformVersion = [IO.File]::ReadAllText([io.path]::combine($implementationDir, "PLATFORM_VERSION"))
   $correctTag = git tag --points-at HEAD | Select-String $requiredPlatformVersion
   if (-not $correctTag) {
     Write-Error "Mono $requiredPlatformVersion is required" -ErrorAction Stop
