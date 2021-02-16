@@ -146,6 +146,20 @@ function Find-And-Stop-Process {
   }
 }
 
+function Parse-Json-Stop-On-Error {
+  param(
+    [parameter(Mandatory=$true)]
+    [string]$Filename
+  )
+
+  $json = ConvertFrom-Json ([IO.File]::ReadAllText($Filename))
+  if (!$json) {
+    Write-Error "Unable to parse $Filename" -ErrorAction Stop
+  }
+
+  return $json
+}
+
 if (!(Test-Path $Root)) {
   Write-Error "Directory $Root does not exist!" -ErrorAction Stop
 }
@@ -153,16 +167,24 @@ if (!(Test-Path $Root)) {
 $implementationDir = [io.path]::combine($Root, "implementation")
 $monoDir = [io.path]::combine($Root, "mono")
 $monoClientDir = [io.path]::combine($monoDir, "client")
+$monoConfDir = [io.path]::combine($monoDir, "server", "AdInsure.Server", "conf")
 $adiEnvDir = [io.path]::combine($implementationDir, ".adi", "environments")
-$envLocalJsonFilename = [io.path]::combine($adiEnvDir, "environment.local.json")
+$implEnvLocalJsonFilename = [io.path]::combine($adiEnvDir, "environment.local.json")
+$monoImplSettingsJsonFilename = [io.path]::combine($monoConfDir, "implSettings.json")
 
 if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $monoClientDir)) {
   Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
 }
 
-if (!(Test-Path $envLocalJsonFilename)) {
-  Write-Error "Missing $envLocalJsonFilename" -ErrorAction Stop
+if (!(Test-Path $implEnvLocalJsonFilename)) {
+  Write-Error "Missing $implEnvLocalJsonFilename" -ErrorAction Stop
 }
+
+if (!(Test-Path $monoImplSettingsJsonFilename)) {
+  Write-Error "Missing $monoImplSettingsJsonFilename" -ErrorAction Stop
+}
+
+
 
 try {
 
@@ -180,7 +202,9 @@ try {
 }
 
 
-$parsedEnvLocalJson = ConvertFrom-Json ([IO.File]::ReadAllText($envLocalJsonFilename))
+
+$parsedImplEnvLocalJson = Parse-Json-Stop-On-Error $implEnvLocalJsonFilename
+$parsedMonoImplSettingsJson = Parse-Json-Stop-On-Error $monoImplSettingsJsonFilename
 
 $requiredJsonTargetlayer = $null
 $requiredJsonCurrency = $null
@@ -192,16 +216,25 @@ if ($Layer -eq "si") {
   $requiredJsonTargetlayer = "sava-hr"
   $requiredJsonCurrency = "HRK"
 } else {
-  Write-Error "Unsupported layer $Layer during $([io.path]::GetFileName($envLocalJsonFilename)) validation" -ErrorAction Stop
+  Write-Error "Unsupported layer $Layer during $([io.path]::GetFileName($implEnvLocalJsonFilename)) validation" -ErrorAction Stop
 }
 
-if ($parsedEnvLocalJson.targetLayer -ne $requiredJsonTargetlayer) {
-  Write-Error "Target layer must be $requiredJsonTargetlayer in $([io.path]::GetFileName($envLocalJsonFilename))" -ErrorAction Stop
+if ($parsedImplEnvLocalJson.targetLayer -ne $requiredJsonTargetlayer) {
+  Write-Error "Target layer must be $requiredJsonTargetlayer in $([io.path]::GetFileName($implEnvLocalJsonFilename))" -ErrorAction Stop
 }
 
-if ($parsedEnvLocalJson.localCurrency -ne $requiredJsonCurrency) {
-  Write-Error "Currency must be $requiredJsonCurrency in $([io.path]::GetFileName($envLocalJsonFilename))" -ErrorAction Stop
+if ($parsedImplEnvLocalJson.localCurrency -ne $requiredJsonCurrency) {
+  Write-Error "Currency must be $requiredJsonCurrency in $([io.path]::GetFileName($implEnvLocalJsonFilename))" -ErrorAction Stop
 }
+
+if ($parsedImplEnvLocalJson.documentIndex -ne $parsedMonoImplSettingsJson.appSettings.AdInsure.Settings.General.ESIndexPrefix) {
+  Write-Error "Document index must be $($parsedMonoImplSettingsJson.appSettings.AdInsure.Settings.General.ESIndexPrefix) in $([io.path]::GetFileName($monoImplSettingsJsonFilename))" -ErrorAction Stop
+}
+
+
+
+
+
 
 Find-And-Stop-Process `
   -ProcessName "AdInsure.Server.exe" `
