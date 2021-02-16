@@ -298,11 +298,9 @@ try {
 
     Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.json"
 
-    $runAgain = $false
     do {
       Run-Command "yarn run publish-workspace -e environment.local.json"
-      $runAgain = ($LASTEXITCODE -ne 0)
-    } while ($runAgain)
+    } while ($LASTEXITCODE -ne 0)
 
     if ($Layer -like "HR") {
       Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
