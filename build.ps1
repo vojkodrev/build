@@ -185,19 +185,19 @@ function Validate-Impl-Env-Local-Json {
     $requiredJsonTargetlayer = "sava-hr"
     $requiredJsonCurrency = "HRK"
   } else {
-    Write-Error "Unsupported layer $Layer during $([io.path]::GetFileName($ImplEnvLocalJsonFilename)) validation" -ErrorAction Stop
+    Write-Error "Unsupported layer $Layer during $ImplEnvLocalJsonFilename validation" -ErrorAction Stop
   }
   
   if ($parsedImplEnvLocalJson.targetLayer -ne $requiredJsonTargetlayer) {
-    Write-Error "Target layer must be $requiredJsonTargetlayer in $([io.path]::GetFileName($ImplEnvLocalJsonFilename))" -ErrorAction Stop
+    Write-Error "Target layer must be $requiredJsonTargetlayer in $ImplEnvLocalJsonFilename" -ErrorAction Stop
   }
   
   if ($parsedImplEnvLocalJson.localCurrency -ne $requiredJsonCurrency) {
-    Write-Error "Currency must be $requiredJsonCurrency in $([io.path]::GetFileName($ImplEnvLocalJsonFilename))" -ErrorAction Stop
+    Write-Error "Currency must be $requiredJsonCurrency in $ImplEnvLocalJsonFilename" -ErrorAction Stop
   }
   
   if ($parsedImplEnvLocalJson.documentIndex -ne $parsedMonoImplSettingsJson.appSettings.AdInsure.Settings.General.ESIndexPrefix) {
-    Write-Error "Document index must be $($parsedMonoImplSettingsJson.appSettings.AdInsure.Settings.General.ESIndexPrefix) in $([io.path]::GetFileName($MonoImplSettingsJsonFilename))" -ErrorAction Stop
+    Write-Error "Document index must be $($parsedMonoImplSettingsJson.appSettings.AdInsure.Settings.General.ESIndexPrefix) in $MonoImplSettingsJsonFilename" -ErrorAction Stop
   }  
 }
 
@@ -258,6 +258,20 @@ Validate-Impl-Env-Local-Json `
   -Layer $Layer `
   -ImplEnvLocalJsonFilename $implEnvLocalJsonFilename `
   -MonoImplSettingsJsonFilename $monoImplSettingsJsonFilename
+
+try {
+  Push-Location
+  Set-Location $implementationDir
+
+  Run-Command-Stop-On-Error "git fetch"
+
+  if ((Get-Date (git log origin/master --pretty=format:"%ad" --date=iso -n 1)) -gt (Get-Date (git log --pretty=format:"%ad" --date=iso -n 1))) {
+    Write-Error "Master is ahead of current branch" -ErrorAction Stop
+  }
+
+} finally {
+  Pop-Location
+}
 
 Find-And-Stop-Process `
   -ProcessName "AdInsure.Server.exe" `
