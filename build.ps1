@@ -160,6 +160,72 @@ function Parse-Json-Stop-On-Error {
   return $json
 }
 
+function Validate-Impl-Env-Local-Json {
+  param(
+    [parameter(Mandatory=$true)]
+    [string]$ImplEnvLocalJsonFilename,
+
+    [parameter(Mandatory=$true)]
+    [string]$MonoImplSettingsJsonFilename,
+
+    [parameter(Mandatory=$true)]
+    [string]$Layer  
+  )
+
+  $parsedImplEnvLocalJson = Parse-Json-Stop-On-Error $ImplEnvLocalJsonFilename
+  $parsedMonoImplSettingsJson = Parse-Json-Stop-On-Error $MonoImplSettingsJsonFilename
+  
+  $requiredJsonTargetlayer = $null
+  $requiredJsonCurrency = $null
+  
+  if ($Layer -eq "si") {
+    $requiredJsonTargetlayer = "sava-si"
+    $requiredJsonCurrency = "EUR"
+  } elseif ($Layer -eq "hr") {
+    $requiredJsonTargetlayer = "sava-hr"
+    $requiredJsonCurrency = "HRK"
+  } else {
+    Write-Error "Unsupported layer $Layer during $([io.path]::GetFileName($ImplEnvLocalJsonFilename)) validation" -ErrorAction Stop
+  }
+  
+  if ($parsedImplEnvLocalJson.targetLayer -ne $requiredJsonTargetlayer) {
+    Write-Error "Target layer must be $requiredJsonTargetlayer in $([io.path]::GetFileName($ImplEnvLocalJsonFilename))" -ErrorAction Stop
+  }
+  
+  if ($parsedImplEnvLocalJson.localCurrency -ne $requiredJsonCurrency) {
+    Write-Error "Currency must be $requiredJsonCurrency in $([io.path]::GetFileName($ImplEnvLocalJsonFilename))" -ErrorAction Stop
+  }
+  
+  if ($parsedImplEnvLocalJson.documentIndex -ne $parsedMonoImplSettingsJson.appSettings.AdInsure.Settings.General.ESIndexPrefix) {
+    Write-Error "Document index must be $($parsedMonoImplSettingsJson.appSettings.AdInsure.Settings.General.ESIndexPrefix) in $([io.path]::GetFileName($MonoImplSettingsJsonFilename))" -ErrorAction Stop
+  }  
+}
+
+function Validate-Platform-Version {
+  param(
+    [parameter(Mandatory=$true)]
+    [string]$ImplementationDir,
+
+    [parameter(Mandatory=$true)]
+    [string]$MonoDir
+  )
+
+  try {
+
+    Push-Location
+    Set-Location $MonoDir
+  
+    $requiredPlatformVersion = [IO.File]::ReadAllText([io.path]::combine($ImplementationDir, "PLATFORM_VERSION"))
+    $correctTag = git tag --points-at HEAD | Select-String $requiredPlatformVersion
+    if (!$correctTag) {
+      Write-Error "Mono $requiredPlatformVersion is required" -ErrorAction Stop
+    }
+  
+  } finally {
+    Pop-Location
+  }
+}
+
 if (!(Test-Path $Root)) {
   Write-Error "Directory $Root does not exist!" -ErrorAction Stop
 }
@@ -184,57 +250,14 @@ if (!(Test-Path $monoImplSettingsJsonFilename)) {
   Write-Error "Missing $monoImplSettingsJsonFilename" -ErrorAction Stop
 }
 
+Validate-Platform-Version `
+  -MonoDir $monoDir `
+  -ImplementationDir $implementationDir
 
-
-try {
-
-  Push-Location
-  Set-Location $monoDir
-
-  $requiredPlatformVersion = [IO.File]::ReadAllText([io.path]::combine($implementationDir, "PLATFORM_VERSION"))
-  $correctTag = git tag --points-at HEAD | Select-String $requiredPlatformVersion
-  if (-not $correctTag) {
-    Write-Error "Mono $requiredPlatformVersion is required" -ErrorAction Stop
-  }
-
-} finally {
-  Pop-Location  
-}
-
-
-
-$parsedImplEnvLocalJson = Parse-Json-Stop-On-Error $implEnvLocalJsonFilename
-$parsedMonoImplSettingsJson = Parse-Json-Stop-On-Error $monoImplSettingsJsonFilename
-
-$requiredJsonTargetlayer = $null
-$requiredJsonCurrency = $null
-
-if ($Layer -eq "si") {
-  $requiredJsonTargetlayer = "sava-si"
-  $requiredJsonCurrency = "EUR"
-} elseif ($Layer -eq "hr") {
-  $requiredJsonTargetlayer = "sava-hr"
-  $requiredJsonCurrency = "HRK"
-} else {
-  Write-Error "Unsupported layer $Layer during $([io.path]::GetFileName($implEnvLocalJsonFilename)) validation" -ErrorAction Stop
-}
-
-if ($parsedImplEnvLocalJson.targetLayer -ne $requiredJsonTargetlayer) {
-  Write-Error "Target layer must be $requiredJsonTargetlayer in $([io.path]::GetFileName($implEnvLocalJsonFilename))" -ErrorAction Stop
-}
-
-if ($parsedImplEnvLocalJson.localCurrency -ne $requiredJsonCurrency) {
-  Write-Error "Currency must be $requiredJsonCurrency in $([io.path]::GetFileName($implEnvLocalJsonFilename))" -ErrorAction Stop
-}
-
-if ($parsedImplEnvLocalJson.documentIndex -ne $parsedMonoImplSettingsJson.appSettings.AdInsure.Settings.General.ESIndexPrefix) {
-  Write-Error "Document index must be $($parsedMonoImplSettingsJson.appSettings.AdInsure.Settings.General.ESIndexPrefix) in $([io.path]::GetFileName($monoImplSettingsJsonFilename))" -ErrorAction Stop
-}
-
-
-
-
-
+Validate-Impl-Env-Local-Json `
+  -Layer $Layer `
+  -ImplEnvLocalJsonFilename $implEnvLocalJsonFilename `
+  -MonoImplSettingsJsonFilename $monoImplSettingsJsonFilename
 
 Find-And-Stop-Process `
   -ProcessName "AdInsure.Server.exe" `
