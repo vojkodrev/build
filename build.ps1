@@ -94,7 +94,7 @@ function Start-Server-In-Background {
 
       Receive-Job $job -OutVariable jOut -ErrorVariable jError
 
-      if ($job.JobStateInfo.State -eq "Failed" -or $ErrorCheck -and $jError -match $ErrorCheck) {
+      if (($job.JobStateInfo.State -eq "Failed") -or ($ErrorCheck -and $jError -match $ErrorCheck)) {
         if ($Retry) {
           $runAgain = $true
         } else {
@@ -277,9 +277,9 @@ Find-And-Stop-Process `
   -ProcessName "AdInsure.Server.exe" `
   -Command 'AdInsure\.Server\.exe.*?run --urls http://\*:60000'  
 
-Find-And-Stop-Process `
-  -ProcessName "docker.exe" `
-  -Command 'docker\.exe.*?run -p 9200:9200 -m 4g -e discovery\.type=single-node --name es elasticsearch:7\.9\.0'
+# Find-And-Stop-Process `
+#   -ProcessName "docker.exe" `
+#   -Command 'docker\.exe.*?run -p 9200:9200 -m 4g -e discovery\.type=single-node --name es elasticsearch:7\.9\.0'
 
 Find-And-Stop-Process `
   -ProcessName "node.exe" `
@@ -293,14 +293,6 @@ try {
 
   Push-Location
   Set-Location $Root
-
-  Start-Server-In-Background `
-    -InitializationScript $sharedFunctions `
-    -CleanUpCommand "docker rm -f es" `
-    -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0' `
-    -Retry `
-    -SuccessCheck ".*?Active license is now \[BASIC\]; Security is disabled.*?" `
-    -ErrorCheck ".*?failure in a Windows system call: The virtual machine or container with the specified identifier is not running.*?"
 
   if ($Clean) {
     Remove-Node-Modules
@@ -318,7 +310,7 @@ try {
         Run-Command "echo no | git clean -fdx"
         Run-Command "git reset --hard"
     
-        if ($gitStashOutput -notmatch ".*?No local changes to save") {
+        if ($gitStashOutput -notmatch "No local changes to save") {
           Run-Command-Stop-On-Error "git stash pop"
         }
       } finally {
@@ -328,6 +320,14 @@ try {
     } finally {
       Pop-Location  
     }
+
+    Start-Server-In-Background `
+      -InitializationScript $sharedFunctions `
+      -CleanUpCommand "docker rm -f es" `
+      -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0' `
+      -Retry `
+      -SuccessCheck "Active license is now \[BASIC\]; Security is disabled" `
+      -ErrorCheck "failure in a Windows system call: The virtual machine or container with the specified identifier is not running"    
   }
 
   try {
@@ -356,13 +356,13 @@ try {
 
     Start-Server-In-Background `
       -Command ".\build.ps1 -RunIS" `
-      -SuccessCheck ".*?IIS Express is running\..*?" `
+      -SuccessCheck "IIS Express is running\." `
       -Dir $monoDir `
       -InitializationScript $sharedFunctions 
 
     Start-Server-In-Background `
       -Command ".\build.ps1 -RunServer" `
-      -SuccessCheck ".*?AdInsure is initialized and ready to use\..*?" `
+      -SuccessCheck "AdInsure is initialized and ready to use\." `
       -Dir $monoDir `
       -InitializationScript $sharedFunctions
 
@@ -389,7 +389,7 @@ try {
     
     Start-Server-In-Background `
       -Command "yarn run start" `
-      -SuccessCheck ".*?Compiled successfully\..*?" `
+      -SuccessCheck "Compiled successfully\." `
       -Dir $monoClientDir `
       -InitializationScript $sharedFunctions
     
