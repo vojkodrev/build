@@ -265,7 +265,7 @@ try {
 
   Run-Command-Stop-On-Error "git fetch"
 
-  if ((Get-Date (git log origin/master --pretty=format:"%ad" --date=iso -n 1)) -le (Get-Date (git log --pretty=format:"%ad" --date=iso -n 1))) {
+  if ((Get-Date (git log origin/master --pretty=format:"%ad" --date=iso -n 1)) -gt (Get-Date (git log --pretty=format:"%ad" --date=iso -n 1))) {
     Write-Error "Master is ahead of current branch" -ErrorAction Stop
   }
 
