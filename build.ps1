@@ -366,10 +366,10 @@ try {
       -Dir $monoDir `
       -InitializationScript $sharedFunctions
 
-    Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.json"
+    Run-Command-Stop-On-Error "yarn run validate-workspace" # -e environment.local.json
 
     do {
-      Run-Command "yarn run publish-workspace -e environment.local.json"
+      Run-Command "yarn run publish-workspace" # -e environment.local.json
     } while ($LASTEXITCODE -ne 0)
 
     if ($Layer -like "HR") {
