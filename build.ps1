@@ -20,11 +20,11 @@ $sharedFunctions = {
     )
   
     if ($Description) {
-      Write-Host $Description
+      Write-Output $Description
     }
     
     $currentLocation = Get-Location
-    Write-Host "$currentLocation> $Command"
+    Write-Output "$currentLocation> $Command"
 
     Invoke-Expression $Command
   }
@@ -114,7 +114,7 @@ function Start-Server-In-Background {
 }
 
 function Remove-Node-Modules {
-  Write-Host "Removing node modules"
+  Write-Output "Removing node modules"
 
   Get-ChildItem -Path $Root -Filter node_modules -Recurse -ErrorAction SilentlyContinue -Force |
   ForEach-Object {
@@ -137,10 +137,10 @@ function Find-And-Stop-Process {
     $commandLine = Select-Object -InputObject $process "CommandLine"
     $processId = Select-Object -InputObject $process "ProcessId"
 
-    # Write-Host $commandLine.CommandLine
+    # Write-Output $commandLine.CommandLine
 
     if ($commandLine.CommandLine -match $Command) {
-      Write-Host "Stopping" $commandLine.CommandLine
+      Write-Output "Stopping" $commandLine.CommandLine
       Stop-Process $processId.ProcessId
     }
   }
@@ -265,7 +265,7 @@ try {
 
   Run-Command-Stop-On-Error "git fetch"
 
-  if ((Get-Date (git log origin/master --pretty=format:"%ad" --date=iso -n 1)) -gt (Get-Date (git log --pretty=format:"%ad" --date=iso -n 1))) {
+  if ((Get-Date (git log origin/master --pretty=format:"%cd" --date=iso -n 1)) -gt (Get-Date (git log --pretty=format:"%cd" --date=iso -n 1))) {
     Write-Error "Master is ahead of current branch" -ErrorAction Stop
   }
 
