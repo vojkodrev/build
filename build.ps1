@@ -140,7 +140,7 @@ function Find-And-Stop-Process {
     # Write-Output $commandLine.CommandLine
 
     if ($commandLine.CommandLine -match $Command) {
-      Write-Output "Stopping" $commandLine.CommandLine
+      Write-Output "Stopping $($commandLine.CommandLine)"
       Stop-Process $processId.ProcessId
     }
   }
