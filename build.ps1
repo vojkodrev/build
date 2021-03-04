@@ -94,7 +94,7 @@ function Start-Server-In-Background {
 
       Receive-Job $job -OutVariable jOut -ErrorVariable jError
 
-      if (($job.JobStateInfo.State -eq "Failed") -or ($ErrorCheck -and $jError -match $ErrorCheck)) {
+      if (($job.JobStateInfo.State -eq "Failed") -or ($ErrorCheck -and ($jError -match $ErrorCheck))) {
         if ($Retry) {
           $runAgain = $true
         } else {
@@ -328,6 +328,14 @@ try {
       -Retry `
       -SuccessCheck "Active license is now \[BASIC\]; Security is disabled" `
       -ErrorCheck "failure in a Windows system call: The virtual machine or container with the specified identifier is not running"    
+
+    Start-Server-In-Background `
+      -InitializationScript $sharedFunctions `
+      -CleanUpCommand "docker rm -f amq" `
+      -Command 'docker run -p 61616:61616 -p 8161:8161 --name amq registry.adacta-fintech.com/adinsure/platform/amq' `
+      -Retry `
+      -SuccessCheck "INFO \| jolokia-agent: Using policy access restrictor classpath:\/jolokia-access.xml" # `
+      # -ErrorCheck "failure in a Windows system call: The virtual machine or container with the specified identifier is not running"         
   }
 
   try {
