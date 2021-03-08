@@ -356,7 +356,8 @@ try {
     Push-Location
     Set-Location .\implementation
 
-    Run-Command-Stop-On-Error ".\build.ps1 -Build -ExecuteScripts -TargetLayer $Layer"
+    Run-Command-Stop-On-Error ".\build.ps1 -Build -TargetLayer $Layer"
+    Run-Command-Stop-On-Error ".\build.ps1 -ExecuteScripts -TargetLayer $Layer"
     Run-Command-Stop-On-Error "yarn install"
 
     if ($Layer -like "hr") {
