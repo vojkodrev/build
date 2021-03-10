@@ -265,8 +265,11 @@ try {
 
   Run-Command-Stop-On-Error "git fetch"
 
-  if ((Get-Date (git log origin/master --pretty=format:"%cd" --date=iso -n 1)) -gt (Get-Date (git log --pretty=format:"%cd" --date=iso -n 1))) {
-    Write-Error "Master is ahead of current branch" -ErrorAction Stop
+  # if ((Get-Date (git log origin/master --pretty=format:"%cd" --date=iso -n 1)) -gt (Get-Date (git log --pretty=format:"%cd" --date=iso -n 1))) {
+  git merge-base --is-ancestor origin/master $(git branch --show-current)
+  if ($LASTEXITCODE -gt 0) {
+    # Write-Error "Master is ahead of current branch" -ErrorAction Stop
+    Write-Error "There are new changes in master. It should be merged into current branch." -ErrorAction Stop
   }
 
 } finally {
