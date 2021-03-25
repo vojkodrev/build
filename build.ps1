@@ -302,6 +302,32 @@ try {
 
     try {
 
+      Write-Output "Cleaning mono"
+
+      Push-Location
+      Set-Location .\mono
+
+      try {
+        Run-Command-Stop-On-Error "Move-Item -Path identityServer\src\AdInsure.IdentityServer\Web.config -Destination .. -Force"
+        Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\databaseConfiguration.json -Destination .. -Force"
+        Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\implSettings.json -Destination .. -Force"
+
+        Run-Command "echo no | git clean -fdx"
+        Run-Command "git reset --hard"
+      } finally {
+        Run-Command-Stop-On-Error "Move-Item -Destination identityServer\src\AdInsure.IdentityServer -Path ..\Web.config -Force"
+        Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\databaseConfiguration.json -Force"
+        Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\implSettings.json -Force"
+      }
+
+    } finally {
+      Pop-Location  
+    }
+
+    try {
+
+      Write-Output "Cleaning implementation"
+
       Push-Location
       Set-Location .\implementation
 
@@ -385,9 +411,7 @@ try {
       Run-Command "yarn run publish-workspace" # -e environment.local.json
     } while ($LASTEXITCODE -ne 0)
 
-    if ($Layer -like "HR") {
-      Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
-    }
+    Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
 
   } finally {
     Pop-Location  
