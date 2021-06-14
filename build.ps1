@@ -172,6 +172,14 @@ function Validate-Impl-Env-Local-Json {
     [string]$Layer  
   )
 
+  if (!(Test-Path $ImplEnvLocalJsonFilename)) {
+    Write-Error "Missing $ImplEnvLocalJsonFilename" -ErrorAction Stop
+  }
+  
+  if (!(Test-Path $MonoImplSettingsJsonFilename)) {
+    Write-Error "Missing $MonoImplSettingsJsonFilename" -ErrorAction Stop
+  }
+
   $parsedImplEnvLocalJson = Parse-Json-Stop-On-Error $ImplEnvLocalJsonFilename
   $parsedMonoImplSettingsJson = Parse-Json-Stop-On-Error $MonoImplSettingsJsonFilename
   
@@ -242,18 +250,6 @@ if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $m
   Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
 }
 
-if (!(Test-Path $implEnvLocalJsonFilename)) {
-  Write-Error "Missing $implEnvLocalJsonFilename" -ErrorAction Stop
-}
-
-if (!(Test-Path $monoImplSettingsJsonFilename)) {
-  Write-Error "Missing $monoImplSettingsJsonFilename" -ErrorAction Stop
-}
-
-Validate-Platform-Version `
-  -MonoDir $monoDir `
-  -ImplementationDir $implementationDir
-
 Validate-Impl-Env-Local-Json `
   -Layer $Layer `
   -ImplEnvLocalJsonFilename $implEnvLocalJsonFilename `
@@ -275,6 +271,10 @@ try {
 } finally {
   Pop-Location
 }
+
+Validate-Platform-Version `
+  -MonoDir $monoDir `
+  -ImplementationDir $implementationDir
 
 Find-And-Stop-Process `
   -ProcessName "AdInsure.Server.exe" `
