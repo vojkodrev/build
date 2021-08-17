@@ -261,11 +261,11 @@ try {
 
   Run-Command-Stop-On-Error "git fetch"
 
-  # if ((Get-Date (git log origin/master --pretty=format:"%cd" --date=iso -n 1)) -gt (Get-Date (git log --pretty=format:"%cd" --date=iso -n 1))) {
-  git merge-base --is-ancestor origin/master $(git branch --show-current)
-  if ($LASTEXITCODE -gt 0) {
-    # Write-Error "Master is ahead of current branch" -ErrorAction Stop
-    Write-Error "There are new changes in master. It should be merged into current branch." -ErrorAction Stop
+  if (git branch --show-current) {
+    git merge-base --is-ancestor origin/master $(git branch --show-current)
+    if ($LASTEXITCODE -gt 0) {
+      Write-Error "There are new changes in master. It should be merged into current branch." -ErrorAction Stop
+    }
   }
 
 } finally {
@@ -312,8 +312,15 @@ try {
         Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\databaseConfiguration.json -Destination .. -Force"
         Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\implSettings.json -Destination .. -Force"
 
+        $gitStashOutput = Run-Command "git stash --include-untracked"
+        Write-Output $gitStashOutput
+
         Run-Command "echo no | git clean -fdx"
         Run-Command "git reset --hard"
+
+        if (!($gitStashOutput -match "No local changes to save")) {
+          Run-Command-Stop-On-Error "git stash pop"
+        }
       } finally {
         Run-Command-Stop-On-Error "Move-Item -Destination identityServer\src\AdInsure.IdentityServer -Path ..\Web.config -Force"
         Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\databaseConfiguration.json -Force"
