@@ -7,7 +7,10 @@ param(
   [string]
   $Layer = "hr",
   
-  [switch]$Clean
+  [switch]$Clean = $false,
+
+  [switch]$BuildDotNetOnly = $false,
+  [switch]$PublishOnly = $false
 )
 
 $sharedFunctions = {
@@ -65,12 +68,12 @@ function Start-Server-In-Background {
 
     [string]$ErrorCheck,
 
-    [switch]$Retry
+    [switch]$Retry = $false
   )
 
   do {
     if ($CleanUpCommand) {
-      Run-Command $CleanUpCommand
+      Run-Command-Stop-On-Error $CleanUpCommand
     }
 
     $runAgain = $false
@@ -276,21 +279,25 @@ Validate-Platform-Version `
   -MonoDir $monoDir `
   -ImplementationDir $implementationDir
 
-Find-And-Stop-Process `
-  -ProcessName "AdInsure.Server.exe" `
-  -Command 'AdInsure\.Server\.exe.*?run --urls http://\*:60000'  
+if (!$PublishOnly) {
+  Find-And-Stop-Process `
+    -ProcessName "AdInsure.Server.exe" `
+    -Command 'AdInsure\.Server\.exe.*?run --urls http://\*:60000'  
 
-# Find-And-Stop-Process `
-#   -ProcessName "docker.exe" `
-#   -Command 'docker\.exe.*?run -p 9200:9200 -m 4g -e discovery\.type=single-node --name es elasticsearch:7\.9\.0'
+  if (!$BuildDotNetOnly) {
+    Find-And-Stop-Process `
+      -ProcessName "node.exe" `
+      -Command 'node\.exe.*?@angular\\cli\\bin\\ng.*?serve'
+  }
 
-Find-And-Stop-Process `
-  -ProcessName "node.exe" `
-  -Command 'node\.exe.*?@angular\\cli\\bin\\ng.*?serve'
+  Find-And-Stop-Process `
+    -ProcessName "AdInsure.IdentityServer.exe" `
+    -Command 'AdInsure\.IdentityServer\.exe"  run'
 
-Find-And-Stop-Process `
-  -ProcessName "iisexpress.exe" `
-  -Command 'iisexpress\.exe.*?/path:.*?AdInsure\.IdentityServer /port:60001'
+  Find-And-Stop-Process `
+    -ProcessName "iisexpress.exe" `
+    -Command 'iisexpress\.exe"  /config:".*?AdInsure\.Scheduler\\config\\applicationhost\.config" /site:"Scheduler\.Web" /apppool:"Scheduler\.Web AppPool"'     
+}
 
 try {
 
@@ -308,8 +315,8 @@ try {
       Set-Location .\mono
 
       try {
-        Run-Command-Stop-On-Error "Move-Item -Path identityServer\src\AdInsure.IdentityServer\Web.config -Destination .. -Force"
-        Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\databaseConfiguration.json -Destination .. -Force"
+        # Run-Command-Stop-On-Error "Move-Item -Path identityServer\src\AdInsure.IdentityServer\appsettings.json -Destination .. -Force"
+        # Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\databaseConfiguration.json -Destination .. -Force"
         Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\implSettings.json -Destination .. -Force"
 
         $gitStashOutput = Run-Command "git stash --include-untracked"
@@ -322,8 +329,8 @@ try {
           Run-Command-Stop-On-Error "git stash pop"
         }
       } finally {
-        Run-Command-Stop-On-Error "Move-Item -Destination identityServer\src\AdInsure.IdentityServer -Path ..\Web.config -Force"
-        Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\databaseConfiguration.json -Force"
+        # Run-Command-Stop-On-Error "Move-Item -Destination identityServer\src\AdInsure.IdentityServer -Path ..\appsettings.json -Force"
+        # Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\databaseConfiguration.json -Force"
         Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\implSettings.json -Force"
       }
 
@@ -371,8 +378,13 @@ try {
       -CleanUpCommand "docker rm -f amq" `
       -Command 'docker run -p 61616:61616 -p 8161:8161 --name amq registry.adacta-fintech.com/adinsure/platform/amq' `
       -Retry `
-      -SuccessCheck "INFO \| jolokia-agent: Using policy access restrictor classpath:\/jolokia-access.xml" # `
-      # -ErrorCheck "failure in a Windows system call: The virtual machine or container with the specified identifier is not running"         
+      -SuccessCheck "INFO \| jolokia-agent: Using policy access restrictor classpath:\/jolokia-access.xml"
+
+    # Start-Server-In-Background `
+    #   -InitializationScript $sharedFunctions `
+    #   -CleanUpCommand 'docker rm -f oracle' `
+    #   -Command 'docker run -p 1521:1521 --name oracle registry.adacta-fintech.com/ops/infra/oracle-xe:18.4-1709' `
+    #   -Retry
   }
 
   try {
@@ -380,8 +392,13 @@ try {
     Push-Location
     Set-Location .\mono
 
-    Run-Command-Stop-On-Error ".\build.ps1 -Build -SkipBasic"
-    Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType Oracle -SkipBasic"
+    if (!$PublishOnly) {
+      Run-Command-Stop-On-Error ".\build.ps1 -Build -SkipBasic"
+
+      if (!$BuildDotNetOnly) {
+        Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType Oracle -SkipBasic"
+      }
+    }
 
   } finally {
     Pop-Location  
@@ -392,33 +409,40 @@ try {
     Push-Location
     Set-Location .\implementation
 
-    Run-Command-Stop-On-Error ".\build.ps1 -Build -TargetLayer $Layer"
-    Run-Command-Stop-On-Error ".\build.ps1 -ExecuteScripts -TargetLayer $Layer"
-    Run-Command-Stop-On-Error "yarn install"
+    if (!$PublishOnly) {
+      Run-Command-Stop-On-Error ".\build.ps1 -Build -TargetLayer $Layer"
+      
+      if (!$BuildDotNetOnly) {
+        Run-Command-Stop-On-Error ".\build.ps1 -ExecuteScripts -TargetLayer $Layer"
+        Run-Command-Stop-On-Error "yarn install"
 
-    if ($Layer -like "hr") {
-      Run-Command-Stop-On-Error ".\build.ps1 -ImportCSV"
+        if ($Layer -like "hr") {
+          Run-Command-Stop-On-Error ".\build.ps1 -ImportCSV"
+        }
+      }
+
+      Start-Server-In-Background `
+        -Command ".\build.ps1 -RunIS" `
+        -SuccessCheck "Hosting started" `
+        -Dir $monoDir `
+        -InitializationScript $sharedFunctions 
+
+      Start-Server-In-Background `
+        -Command ".\build.ps1 -RunServer" `
+        -SuccessCheck "AdInsure is initialized and ready to use\." `
+        -Dir $monoDir `
+        -InitializationScript $sharedFunctions
     }
 
-    Start-Server-In-Background `
-      -Command ".\build.ps1 -RunIS" `
-      -SuccessCheck "IIS Express is running\." `
-      -Dir $monoDir `
-      -InitializationScript $sharedFunctions 
+    if (!$BuildDotNetOnly) {
+      Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.json"
 
-    Start-Server-In-Background `
-      -Command ".\build.ps1 -RunServer" `
-      -SuccessCheck "AdInsure is initialized and ready to use\." `
-      -Dir $monoDir `
-      -InitializationScript $sharedFunctions
+      Run-Command-Stop-On-Error "yarn run publish-workspace -e environment.local.json"
 
-    Run-Command-Stop-On-Error "yarn run validate-workspace" # -e environment.local.json
-
-    do {
-      Run-Command "yarn run publish-workspace" # -e environment.local.json
-    } while ($LASTEXITCODE -ne 0)
-
-    Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
+      if (!$PublishOnly) {
+        Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
+      }
+    }
 
   } finally {
     Pop-Location  
@@ -429,13 +453,15 @@ try {
     Push-Location
     Set-Location .\mono\client
 
-    Run-Command-Stop-On-Error "yarn install"
-    
-    Start-Server-In-Background `
-      -Command "yarn run start" `
-      -SuccessCheck "Compiled successfully\." `
-      -Dir $monoClientDir `
-      -InitializationScript $sharedFunctions
+    if (!$BuildDotNetOnly -and !$PublishOnly) {
+      Run-Command-Stop-On-Error "yarn install"
+      
+      Start-Server-In-Background `
+        -Command "yarn run start" `
+        -SuccessCheck "Compiled successfully\." `
+        -Dir $monoClientDir `
+        -InitializationScript $sharedFunctions
+    }
     
   } finally {
     Pop-Location  
