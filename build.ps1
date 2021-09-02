@@ -277,10 +277,6 @@ function Set-All-Values {
   }
 }
 
-if (!(Test-Path $Root)) {
-  Write-Error "Directory $Root does not exist!" -ErrorAction Stop
-}
-
 $instructions = @{
   ValidatePlatformVersion = $false
   StopAdInsureServer = $false
@@ -323,6 +319,10 @@ if (!$PublishOnly -and !$BuildDotNetOnly) {
 
 if ($DontValidatePlatformVersion) {
   $instructions.ValidatePlatformVersion = $false
+}
+
+if (!(Test-Path $Root)) {
+  Write-Error "Directory $Root does not exist!" -ErrorAction Stop
 }
 
 $implementationDir = [io.path]::combine($Root, "implementation")
