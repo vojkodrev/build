@@ -10,7 +10,8 @@ param(
   [switch]$Clean = $false,
 
   [switch]$BuildDotNetOnly = $false,
-  [switch]$PublishOnly = $false
+  [switch]$PublishOnly = $false,
+  [switch]$DontValidatePlatformVersion = $false
 )
 
 $sharedFunctions = {
@@ -237,8 +238,91 @@ function Validate-Platform-Version {
   }
 }
 
+function Validate-Implementation-Master-Branch {
+  param(
+    [parameter(Mandatory=$true)]
+    [string]$ImplementationDir
+  )
+
+  try {
+    Push-Location
+    Set-Location $ImplementationDir
+  
+    Run-Command-Stop-On-Error "git fetch"
+  
+    if (git branch --show-current) {
+      git merge-base --is-ancestor origin/master $(git branch --show-current)
+      if ($LASTEXITCODE -gt 0) {
+        Write-Error "There are new changes in master. It should be merged into current branch." -ErrorAction Stop
+      }
+    }
+  
+  } finally {
+    Pop-Location
+  }
+}
+
+function Set-All-Values {
+  param(
+    [parameter(Mandatory=$true)]
+    [hashtable]$Hashtable,
+
+    [parameter(Mandatory=$true)]
+    $Value
+  )
+
+  $keys = $Hashtable.Keys | ForEach-Object ToString
+  foreach ($key in $keys) {
+    $Hashtable[$key] = $Value
+  }
+}
+
 if (!(Test-Path $Root)) {
   Write-Error "Directory $Root does not exist!" -ErrorAction Stop
+}
+
+$instructions = @{
+  ValidatePlatformVersion = $false
+  StopAdInsureServer = $false
+  StopAngularClient = $false
+  StopIdentityServer = $false
+  StopScheduler = $false
+  BuildAdInsureServer = $false
+  RestoreDatabase = $false
+  BuildImplementation = $false
+  ExecuteImplementationDatabaseScripts = $false
+  InstallImplementationNodePackages = $false
+  ImportCSV = $false
+  StartIdentityServer = $false
+  StartAdInsureServer = $false
+  ValidateWorkspace = $false
+  PublishWorkspace = $false
+  ExecuteImplementationPostPublishDatabaseScripts = $false
+  InstallAngularNodePackages = $false
+  StartAngularClient = $false
+}
+
+if ($PublishOnly) {
+  $instructions.ValidateWorkspace = $true
+  $instructions.PublishWorkspace = $true
+}
+
+if ($BuildDotNetOnly) {
+  $instructions.StopAdInsureServer = $true
+  $instructions.StopIdentityServer = $true
+  $instructions.StopScheduler = $true
+  $instructions.BuildAdInsureServer = $true
+  $instructions.BuildImplementation = $true
+  $instructions.StartIdentityServer = $true
+  $instructions.StartAdInsureServer = $true
+}
+
+if (!$PublishOnly -and !$BuildDotNetOnly) {
+  Set-All-Values $instructions -Value $true
+}
+
+if ($DontValidatePlatformVersion) {
+  $instructions.ValidatePlatformVersion = $false
 }
 
 $implementationDir = [io.path]::combine($Root, "implementation")
@@ -258,42 +342,34 @@ Validate-Impl-Env-Local-Json `
   -ImplEnvLocalJsonFilename $implEnvLocalJsonFilename `
   -MonoImplSettingsJsonFilename $monoImplSettingsJsonFilename
 
-try {
-  Push-Location
-  Set-Location $implementationDir
-
-  Run-Command-Stop-On-Error "git fetch"
-
-  if (git branch --show-current) {
-    git merge-base --is-ancestor origin/master $(git branch --show-current)
-    if ($LASTEXITCODE -gt 0) {
-      Write-Error "There are new changes in master. It should be merged into current branch." -ErrorAction Stop
-    }
-  }
-
-} finally {
-  Pop-Location
-}
-
-Validate-Platform-Version `
-  -MonoDir $monoDir `
+Validate-Implementation-Master-Branch `
   -ImplementationDir $implementationDir
 
-if (!$PublishOnly) {
+if ($instructions.ValidatePlatformVersion) {
+  Validate-Platform-Version `
+    -MonoDir $monoDir `
+    -ImplementationDir $implementationDir
+}
+
+if ($instructions.StopAdInsureServer) {
   Find-And-Stop-Process `
     -ProcessName "AdInsure.Server.exe" `
     -Command 'AdInsure\.Server\.exe.*?run --urls http://\*:60000'  
+}
 
-  if (!$BuildDotNetOnly) {
-    Find-And-Stop-Process `
-      -ProcessName "node.exe" `
-      -Command 'node\.exe.*?@angular\\cli\\bin\\ng.*?serve'
-  }
+if ($instructions.StopAngularClient) {
+  Find-And-Stop-Process `
+    -ProcessName "node.exe" `
+    -Command 'node\.exe.*?@angular\\cli\\bin\\ng.*?serve'
+}
 
+if ($instructions.StopIdentityServer) {
   Find-And-Stop-Process `
     -ProcessName "AdInsure.IdentityServer.exe" `
     -Command 'AdInsure\.IdentityServer\.exe"  run'
+}
 
+if ($instructions.StopScheduler) {
   Find-And-Stop-Process `
     -ProcessName "iisexpress.exe" `
     -Command 'iisexpress\.exe"  /config:".*?AdInsure\.Scheduler\\config\\applicationhost\.config" /site:"Scheduler\.Web" /apppool:"Scheduler\.Web AppPool"'     
@@ -392,12 +468,12 @@ try {
     Push-Location
     Set-Location .\mono
 
-    if (!$PublishOnly) {
+    if ($instructions.BuildAdInsureServer) {
       Run-Command-Stop-On-Error ".\build.ps1 -Build -SkipBasic"
-
-      if (!$BuildDotNetOnly) {
-        Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType Oracle -SkipBasic"
-      }
+    }
+    
+    if ($instructions.RestoreDatabase) {
+      Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType Oracle -SkipBasic"
     }
 
   } finally {
@@ -409,24 +485,31 @@ try {
     Push-Location
     Set-Location .\implementation
 
-    if (!$PublishOnly) {
+    if ($instructions.BuildImplementation) {
       Run-Command-Stop-On-Error ".\build.ps1 -Build -TargetLayer $Layer"
-      
-      if (!$BuildDotNetOnly) {
-        Run-Command-Stop-On-Error ".\build.ps1 -ExecuteScripts -TargetLayer $Layer"
-        Run-Command-Stop-On-Error "yarn install"
+    }
+    
+    if ($instructions.ExecuteImplementationDatabaseScripts) {
+      Run-Command-Stop-On-Error ".\build.ps1 -ExecuteScripts -TargetLayer $Layer"
+    }
+    
+    if ($instructions.InstallImplementationNodePackages) {
+      Run-Command-Stop-On-Error "yarn install"
+    }
 
-        if ($Layer -like "hr") {
-          Run-Command-Stop-On-Error ".\build.ps1 -ImportCSV"
-        }
-      }
+    if (($Layer -like "hr") -and ($instructions.ImportCSV)) {
+      Run-Command-Stop-On-Error ".\build.ps1 -ImportCSV"
+    }
 
+    if ($instructions.StartIdentityServer) {
       Start-Server-In-Background `
         -Command ".\build.ps1 -RunIS" `
         -SuccessCheck "Hosting started" `
         -Dir $monoDir `
         -InitializationScript $sharedFunctions 
+    }
 
+    if ($instructions.StartAdInsureServer) {
       Start-Server-In-Background `
         -Command ".\build.ps1 -RunServer" `
         -SuccessCheck "AdInsure is initialized and ready to use\." `
@@ -434,14 +517,16 @@ try {
         -InitializationScript $sharedFunctions
     }
 
-    if (!$BuildDotNetOnly) {
+    if ($instructions.ValidateWorkspace) {
       Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.json"
-
+    }
+    
+    if ($instructions.PublishWorkspace) {
       Run-Command-Stop-On-Error "yarn run publish-workspace -e environment.local.json"
-
-      if (!$PublishOnly) {
-        Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
-      }
+    }
+    
+    if ($instructions.ExecuteImplementationPostPublishDatabaseScripts) {
+      Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
     }
 
   } finally {
@@ -453,9 +538,11 @@ try {
     Push-Location
     Set-Location .\mono\client
 
-    if (!$BuildDotNetOnly -and !$PublishOnly) {
+    if ($instructions.InstallAngularNodePackages) {
       Run-Command-Stop-On-Error "yarn install"
-      
+    }
+    
+    if ($instructions.StartAngularClient) {
       Start-Server-In-Background `
         -Command "yarn run start" `
         -SuccessCheck "Compiled successfully\." `
