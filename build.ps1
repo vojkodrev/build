@@ -277,6 +277,24 @@ function Set-All-Values {
   }
 }
 
+function All-Values-Are {
+  param(
+    [parameter(Mandatory=$true)]
+    [array]$Arr,
+
+    [parameter(Mandatory=$true)]
+    $Value
+  )
+
+  foreach ($e in $arr) {
+    if ($e -ne $Value) {
+      return $false
+    }
+  }
+
+  return $true
+}
+
 $instructions = @{
   ValidatePlatformVersion = $false
   StopAdInsureServer = $false
@@ -313,7 +331,7 @@ if ($BuildDotNetOnly) {
   $instructions.StartAdInsureServer = $true
 }
 
-if (!$PublishOnly -and !$BuildDotNetOnly) {
+if (All-Values-Are @($PublishOnly, $BuildDotNetOnly) -Value $false) {
   Set-All-Values $instructions -Value $true
 }
 
