@@ -10,8 +10,11 @@ param(
   [switch]$Clean = $false,
 
   [switch]$BuildDotNetOnly = $false,
+  [switch]$BuildImplementationOnly = $false,
   [switch]$PublishOnly = $false,
-  [switch]$DontValidatePlatformVersion = $false
+  [switch]$DontValidatePlatformVersion = $false,
+  [switch]$DontValidateImplementationMasterBranch = $false,
+  [switch]$StartServersOnly = $false
 )
 
 $sharedFunctions = {
@@ -20,7 +23,9 @@ $sharedFunctions = {
       [Parameter(Mandatory=$true)]
       [string]$Command,
   
-      [string]$Description
+      [string]$Description,
+
+      [ref]$CommandOutput
     )
   
     if ($Description) {
@@ -30,7 +35,11 @@ $sharedFunctions = {
     $currentLocation = Get-Location
     Write-Output "$currentLocation> $Command"
 
-    Invoke-Expression $Command
+    Invoke-Expression $Command | Tee-Object -Variable ieo
+
+    if ($CommandOutput) {
+      $CommandOutput.Value = $ieo
+    }
   }
 }
 
@@ -297,6 +306,7 @@ function All-Values-Are {
 
 $instructions = @{
   ValidatePlatformVersion = $false
+  ValidateImplementationMasterBranch = $false
   StopAdInsureServer = $false
   StopAngularClient = $false
   StopIdentityServer = $false
@@ -331,7 +341,23 @@ if ($BuildDotNetOnly) {
   $instructions.StartAdInsureServer = $true
 }
 
-if (All-Values-Are @($PublishOnly, $BuildDotNetOnly) -Value $false) {
+if ($BuildImplementationOnly) {
+  $instructions.StopAdInsureServer = $true
+  $instructions.StopScheduler = $true
+  $instructions.BuildImplementation = $true
+  $instructions.StartAdInsureServer = $true
+}
+
+if ($StartServersOnly) {
+  $instructions.StopAdInsureServer = $true
+  $instructions.StopIdentityServer = $true
+  $instructions.StopAngularClient = $true
+  $instructions.StartIdentityServer = $true
+  $instructions.StartAdInsureServer = $true
+  $instructions.StartAngularClient = $true
+}
+
+if (All-Values-Are @($PublishOnly, $BuildDotNetOnly, $StartServersOnly, $BuildImplementationOnly) -Value $false) {
   Set-All-Values $instructions -Value $true
 }
 
@@ -339,11 +365,16 @@ if ($DontValidatePlatformVersion) {
   $instructions.ValidatePlatformVersion = $false
 }
 
+if ($DontValidateImplementationMasterBranch) {
+  $instructions.ValidateImplementationMasterBranch = $false
+}
+
 if (!(Test-Path $Root)) {
   Write-Error "Directory $Root does not exist!" -ErrorAction Stop
 }
 
 $implementationDir = [io.path]::combine($Root, "implementation")
+$implementationConfigurationDir = [io.path]::combine($implementationDir, "configuration")
 $monoDir = [io.path]::combine($Root, "mono")
 $monoClientDir = [io.path]::combine($monoDir, "client")
 $monoConfDir = [io.path]::combine($monoDir, "server", "AdInsure.Server", "conf")
@@ -351,7 +382,7 @@ $adiEnvDir = [io.path]::combine($implementationDir, ".adi", "environments")
 $implEnvLocalJsonFilename = [io.path]::combine($adiEnvDir, "environment.local.json")
 $monoImplSettingsJsonFilename = [io.path]::combine($monoConfDir, "implSettings.json")
 
-if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $monoClientDir)) {
+if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $monoClientDir) -or !(Test-Path $implementationConfigurationDir)) {
   Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
 }
 
@@ -360,8 +391,10 @@ Validate-Impl-Env-Local-Json `
   -ImplEnvLocalJsonFilename $implEnvLocalJsonFilename `
   -MonoImplSettingsJsonFilename $monoImplSettingsJsonFilename
 
-Validate-Implementation-Master-Branch `
-  -ImplementationDir $implementationDir
+if ($instructions.ValidateImplementationMasterBranch) {
+  Validate-Implementation-Master-Branch `
+    -ImplementationDir $implementationDir
+}
 
 if ($instructions.ValidatePlatformVersion) {
   Validate-Platform-Version `
@@ -536,11 +569,23 @@ try {
     }
 
     if ($instructions.ValidateWorkspace) {
-      Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.json"
+      Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.json" #-CommandOutput ([ref]$validateWorkspaceOutput)
     }
     
     if ($instructions.PublishWorkspace) {
-      Run-Command-Stop-On-Error "yarn run publish-workspace -e environment.local.json"
+      do {
+
+        $runAgain = $false
+        $publishWorkspaceOutput = $null
+        Run-Command "yarn run publish-workspace -e environment.local.json" -CommandOutput ([ref]$publishWorkspaceOutput)
+
+        if ($publishWorkspaceOutput -match "\[ERROR\].*?Invocation of script 'Publish workspace' failed.*?Token exchange failed.*?TimeoutError") {
+          $runAgain = $true
+        }
+        elseif ($LASTEXITCODE -ne 0) {
+          Write-Error "Publish Workspace FAILED!" -ErrorAction Stop
+        }
+      } while ($runAgain)
     }
     
     if ($instructions.ExecuteImplementationPostPublishDatabaseScripts) {
