@@ -7,6 +7,9 @@ param(
   [string]
   $Layer = "hr",
   
+  [string]
+  $MasterBranchName = "origin/master",
+
   [switch]$Clean = $false,
 
   [switch]$BuildDotNetOnly = $false,
@@ -107,7 +110,7 @@ function Start-Server-In-Background {
 
       Receive-Job $job -OutVariable jOut -ErrorVariable jError
 
-      if (($job.JobStateInfo.State -eq "Failed") -or ($ErrorCheck -and ($jError -match $ErrorCheck))) {
+      if (($job.JobStateInfo.State -eq "Failed") -or ($ErrorCheck -and ($jError -match $ErrorCheck)) -or ($ErrorCheck -and ($jOut -match $ErrorCheck))) {
         if ($Retry) {
           $runAgain = $true
         } else {
@@ -250,7 +253,10 @@ function Validate-Platform-Version {
 function Validate-Implementation-Master-Branch {
   param(
     [parameter(Mandatory=$true)]
-    [string]$ImplementationDir
+    [string]$ImplementationDir,
+
+    [parameter(Mandatory=$true)]
+    [string]$MasterBranchName
   )
 
   try {
@@ -260,9 +266,9 @@ function Validate-Implementation-Master-Branch {
     Run-Command-Stop-On-Error "git fetch"
   
     if (git branch --show-current) {
-      git merge-base --is-ancestor origin/master $(git branch --show-current)
+      git merge-base --is-ancestor $MasterBranchName $(git branch --show-current)
       if ($LASTEXITCODE -gt 0) {
-        Write-Error "There are new changes in master. It should be merged into current branch." -ErrorAction Stop
+        Write-Error "There are new changes in $MasterBranchName. It should be merged into current branch." -ErrorAction Stop
       }
     }
   
@@ -327,11 +333,15 @@ $instructions = @{
 }
 
 if ($PublishOnly) {
+  $instructions.ValidatePlatformVersion = $true
+  $instructions.ValidateImplementationMasterBranch = $true
   $instructions.ValidateWorkspace = $true
   $instructions.PublishWorkspace = $true
 }
 
 if ($BuildDotNetOnly) {
+  $instructions.ValidatePlatformVersion = $true
+  $instructions.ValidateImplementationMasterBranch = $true
   $instructions.StopAdInsureServer = $true
   $instructions.StopIdentityServer = $true
   $instructions.StopScheduler = $true
@@ -342,6 +352,8 @@ if ($BuildDotNetOnly) {
 }
 
 if ($BuildImplementationOnly) {
+  $instructions.ValidatePlatformVersion = $true
+  $instructions.ValidateImplementationMasterBranch = $true
   $instructions.StopAdInsureServer = $true
   $instructions.StopScheduler = $true
   $instructions.BuildImplementation = $true
@@ -349,6 +361,8 @@ if ($BuildImplementationOnly) {
 }
 
 if ($StartServersOnly) {
+  $instructions.ValidatePlatformVersion = $true
+  $instructions.ValidateImplementationMasterBranch = $true
   $instructions.StopAdInsureServer = $true
   $instructions.StopIdentityServer = $true
   $instructions.StopAngularClient = $true
@@ -386,14 +400,15 @@ if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $m
   Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
 }
 
-Validate-Impl-Env-Local-Json `
-  -Layer $Layer `
-  -ImplEnvLocalJsonFilename $implEnvLocalJsonFilename `
-  -MonoImplSettingsJsonFilename $monoImplSettingsJsonFilename
+# Validate-Impl-Env-Local-Json `
+#   -Layer $Layer `
+#   -ImplEnvLocalJsonFilename $implEnvLocalJsonFilename `
+#   -MonoImplSettingsJsonFilename $monoImplSettingsJsonFilename
 
 if ($instructions.ValidateImplementationMasterBranch) {
   Validate-Implementation-Master-Branch `
-    -ImplementationDir $implementationDir
+    -ImplementationDir $implementationDir `
+    -MasterBranchName $MasterBranchName
 }
 
 if ($instructions.ValidatePlatformVersion) {
@@ -473,7 +488,7 @@ try {
       Set-Location .\implementation
 
       try {
-        Run-Command-Stop-On-Error "Move-Item -Path .adi\environments\environment.local.json -Destination .. -Force"
+        # Run-Command-Stop-On-Error "Move-Item -Path .adi\environments\environment.local.json -Destination .. -Force"
 
         $gitStashOutput = Run-Command "git stash --include-untracked"
         Write-Output $gitStashOutput
@@ -485,7 +500,7 @@ try {
           Run-Command-Stop-On-Error "git stash pop"
         }
       } finally {
-        Run-Command-Stop-On-Error "Move-Item -Destination .adi\environments -Path ..\environment.local.json -Force"
+        # Run-Command-Stop-On-Error "Move-Item -Destination .adi\environments -Path ..\environment.local.json -Force"
       }
 
     } finally {
@@ -495,7 +510,7 @@ try {
     Start-Server-In-Background `
       -InitializationScript $sharedFunctions `
       -CleanUpCommand "docker rm -f es" `
-      -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --name es elasticsearch:7.9.0' `
+      -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --platform=linux --name es -h es elasticsearch:7.9.0' `
       -Retry `
       -SuccessCheck "Active license is now \[BASIC\]; Security is disabled" `
       -ErrorCheck "failure in a Windows system call: The virtual machine or container with the specified identifier is not running"    
@@ -503,7 +518,7 @@ try {
     Start-Server-In-Background `
       -InitializationScript $sharedFunctions `
       -CleanUpCommand "docker rm -f amq" `
-      -Command 'docker run -p 61616:61616 -p 8161:8161 --name amq registry.adacta-fintech.com/adinsure/platform/amq' `
+      -Command 'docker run -p 61616:61616 -p 8161:8161 --platform=linux --name amq rmohr/activemq:5.15.9' `
       -Retry `
       -SuccessCheck "INFO \| jolokia-agent: Using policy access restrictor classpath:\/jolokia-access.xml"
 
@@ -524,7 +539,7 @@ try {
     }
     
     if ($instructions.RestoreDatabase) {
-      Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType Oracle -SkipBasic"
+      Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType Oracle -SkipBasic -DatabaseOracleSID ORCLCDB"
     }
 
   } finally {
@@ -557,7 +572,8 @@ try {
         -Command ".\build.ps1 -RunIS" `
         -SuccessCheck "Hosting started" `
         -Dir $monoDir `
-        -InitializationScript $sharedFunctions 
+        -InitializationScript $sharedFunctions `
+        -ErrorCheck "Unable to start Kestrel\."
     }
 
     if ($instructions.StartAdInsureServer) {
@@ -569,7 +585,7 @@ try {
     }
 
     if ($instructions.ValidateWorkspace) {
-      Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.json" #-CommandOutput ([ref]$validateWorkspaceOutput)
+      Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.$Layer.json" #-CommandOutput ([ref]$validateWorkspaceOutput)
     }
     
     if ($instructions.PublishWorkspace) {
@@ -577,7 +593,7 @@ try {
 
         $runAgain = $false
         $publishWorkspaceOutput = $null
-        Run-Command "yarn run publish-workspace -e environment.local.json" -CommandOutput ([ref]$publishWorkspaceOutput)
+        Run-Command "yarn run publish-workspace -e environment.local.$Layer.json" -CommandOutput ([ref]$publishWorkspaceOutput)
 
         if ($publishWorkspaceOutput -match "\[ERROR\].*?Invocation of script 'Publish workspace' failed.*?Token exchange failed.*?TimeoutError") {
           $runAgain = $true
