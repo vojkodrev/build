@@ -3,7 +3,7 @@ param(
   [string]
   $Root = "c:\code\sava",
   
-  [ValidateSet("hr", "si")]
+  [ValidateSet("hr", "si", "generali-hu")]
   [string]
   $Layer = "hr",
   
@@ -179,7 +179,7 @@ function Parse-Json-Stop-On-Error {
 function Validate-Impl-Env-Local-Json {
   param(
     [parameter(Mandatory=$true)]
-    [string]$ImplEnvLocalJsonFilename,
+    [string]$ImplEnvLocalJsonPath,
 
     [parameter(Mandatory=$true)]
     [string]$MonoImplSettingsJsonFilename,
@@ -188,15 +188,15 @@ function Validate-Impl-Env-Local-Json {
     [string]$Layer  
   )
 
-  if (!(Test-Path $ImplEnvLocalJsonFilename)) {
-    Write-Error "Missing $ImplEnvLocalJsonFilename" -ErrorAction Stop
+  if (!(Test-Path $ImplEnvLocalJsonPath)) {
+    Write-Error "Missing $ImplEnvLocalJsonPath" -ErrorAction Stop
   }
   
   if (!(Test-Path $MonoImplSettingsJsonFilename)) {
     Write-Error "Missing $MonoImplSettingsJsonFilename" -ErrorAction Stop
   }
 
-  $parsedImplEnvLocalJson = Parse-Json-Stop-On-Error $ImplEnvLocalJsonFilename
+  $parsedImplEnvLocalJson = Parse-Json-Stop-On-Error $ImplEnvLocalJsonPath
   $parsedMonoImplSettingsJson = Parse-Json-Stop-On-Error $MonoImplSettingsJsonFilename
   
   $requiredJsonTargetlayer = $null
@@ -209,15 +209,15 @@ function Validate-Impl-Env-Local-Json {
     $requiredJsonTargetlayer = "sava-hr"
     $requiredJsonCurrency = "HRK"
   } else {
-    Write-Error "Unsupported layer $Layer during $ImplEnvLocalJsonFilename validation" -ErrorAction Stop
+    Write-Error "Unsupported layer $Layer during $ImplEnvLocalJsonPath validation" -ErrorAction Stop
   }
   
   if ($parsedImplEnvLocalJson.targetLayer -ne $requiredJsonTargetlayer) {
-    Write-Error "Target layer must be $requiredJsonTargetlayer in $ImplEnvLocalJsonFilename" -ErrorAction Stop
+    Write-Error "Target layer must be $requiredJsonTargetlayer in $ImplEnvLocalJsonPath" -ErrorAction Stop
   }
   
   if ($parsedImplEnvLocalJson.localCurrency -ne $requiredJsonCurrency) {
-    Write-Error "Currency must be $requiredJsonCurrency in $ImplEnvLocalJsonFilename" -ErrorAction Stop
+    Write-Error "Currency must be $requiredJsonCurrency in $ImplEnvLocalJsonPath" -ErrorAction Stop
   }
   
   if ($parsedImplEnvLocalJson.documentIndex -ne $parsedMonoImplSettingsJson.appSettings.AdInsure.Settings.General.ESIndexPrefix) {
@@ -234,9 +234,10 @@ function Validate-Platform-Version {
     [string]$MonoDir
   )
 
+  $startingLocation = Get-Location
+
   try {
 
-    Push-Location
     Set-Location $MonoDir
   
     $requiredPlatformVersion = [IO.File]::ReadAllText([io.path]::combine($ImplementationDir, "PLATFORM_VERSION"))
@@ -246,7 +247,7 @@ function Validate-Platform-Version {
     }
   
   } finally {
-    Pop-Location
+    Set-Location $startingLocation
   }
 }
 
@@ -259,8 +260,9 @@ function Validate-Implementation-Master-Branch {
     [string]$MasterBranchName
   )
 
+  $startingLocation = Get-Location
+
   try {
-    Push-Location
     Set-Location $ImplementationDir
   
     Run-Command-Stop-On-Error "git fetch"
@@ -273,7 +275,7 @@ function Validate-Implementation-Master-Branch {
     }
   
   } finally {
-    Pop-Location
+    Set-Location $startingLocation
   }
 }
 
@@ -310,202 +312,196 @@ function All-Values-Are {
   return $true
 }
 
-$instructions = @{
-  ValidatePlatformVersion = $false
-  ValidateImplementationMasterBranch = $false
-  StopAdInsureServer = $false
-  StopAngularClient = $false
-  StopIdentityServer = $false
-  StopScheduler = $false
-  BuildAdInsureServer = $false
-  RestoreDatabase = $false
-  BuildImplementation = $false
-  ExecuteImplementationDatabaseScripts = $false
-  InstallImplementationNodePackages = $false
-  ImportCSV = $false
-  StartIdentityServer = $false
-  StartAdInsureServer = $false
-  ValidateWorkspace = $false
-  PublishWorkspace = $false
-  ExecuteImplementationPostPublishDatabaseScripts = $false
-  InstallAngularNodePackages = $false
-  StartAngularClient = $false
-}
-
-if ($PublishOnly) {
-  $instructions.ValidatePlatformVersion = $true
-  $instructions.ValidateImplementationMasterBranch = $true
-  $instructions.ValidateWorkspace = $true
-  $instructions.PublishWorkspace = $true
-}
-
-if ($BuildDotNetOnly) {
-  $instructions.ValidatePlatformVersion = $true
-  $instructions.ValidateImplementationMasterBranch = $true
-  $instructions.StopAdInsureServer = $true
-  $instructions.StopIdentityServer = $true
-  $instructions.StopScheduler = $true
-  $instructions.BuildAdInsureServer = $true
-  $instructions.BuildImplementation = $true
-  $instructions.StartIdentityServer = $true
-  $instructions.StartAdInsureServer = $true
-}
-
-if ($BuildImplementationOnly) {
-  $instructions.ValidatePlatformVersion = $true
-  $instructions.ValidateImplementationMasterBranch = $true
-  $instructions.StopAdInsureServer = $true
-  $instructions.StopScheduler = $true
-  $instructions.BuildImplementation = $true
-  $instructions.StartAdInsureServer = $true
-}
-
-if ($StartServersOnly) {
-  $instructions.ValidatePlatformVersion = $true
-  $instructions.ValidateImplementationMasterBranch = $true
-  $instructions.StopAdInsureServer = $true
-  $instructions.StopIdentityServer = $true
-  $instructions.StopAngularClient = $true
-  $instructions.StartIdentityServer = $true
-  $instructions.StartAdInsureServer = $true
-  $instructions.StartAngularClient = $true
-}
-
-if (All-Values-Are @($PublishOnly, $BuildDotNetOnly, $StartServersOnly, $BuildImplementationOnly) -Value $false) {
-  Set-All-Values $instructions -Value $true
-}
-
-if ($DontValidatePlatformVersion) {
-  $instructions.ValidatePlatformVersion = $false
-}
-
-if ($DontValidateImplementationMasterBranch) {
-  $instructions.ValidateImplementationMasterBranch = $false
-}
-
-if (!(Test-Path $Root)) {
-  Write-Error "Directory $Root does not exist!" -ErrorAction Stop
-}
-
-$implementationDir = [io.path]::combine($Root, "implementation")
-$implementationConfigurationDir = [io.path]::combine($implementationDir, "configuration")
-$monoDir = [io.path]::combine($Root, "mono")
-$monoClientDir = [io.path]::combine($monoDir, "client")
-$monoConfDir = [io.path]::combine($monoDir, "server", "AdInsure.Server", "conf")
-$adiEnvDir = [io.path]::combine($implementationDir, ".adi", "environments")
-$implEnvLocalJsonFilename = [io.path]::combine($adiEnvDir, "environment.local.json")
-$monoImplSettingsJsonFilename = [io.path]::combine($monoConfDir, "implSettings.json")
-
-if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $monoClientDir) -or !(Test-Path $implementationConfigurationDir)) {
-  Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
-}
-
-# Validate-Impl-Env-Local-Json `
-#   -Layer $Layer `
-#   -ImplEnvLocalJsonFilename $implEnvLocalJsonFilename `
-#   -MonoImplSettingsJsonFilename $monoImplSettingsJsonFilename
-
-if ($instructions.ValidateImplementationMasterBranch) {
-  Validate-Implementation-Master-Branch `
-    -ImplementationDir $implementationDir `
-    -MasterBranchName $MasterBranchName
-}
-
-if ($instructions.ValidatePlatformVersion) {
-  Validate-Platform-Version `
-    -MonoDir $monoDir `
-    -ImplementationDir $implementationDir
-}
-
-if ($instructions.StopAdInsureServer) {
-  Find-And-Stop-Process `
-    -ProcessName "AdInsure.Server.exe" `
-    -Command 'AdInsure\.Server\.exe.*?run --urls http://\*:60000'  
-}
-
-if ($instructions.StopAngularClient) {
-  Find-And-Stop-Process `
-    -ProcessName "node.exe" `
-    -Command 'node\.exe.*?@angular\\cli\\bin\\ng.*?serve'
-}
-
-if ($instructions.StopIdentityServer) {
-  Find-And-Stop-Process `
-    -ProcessName "AdInsure.IdentityServer.exe" `
-    -Command 'AdInsure\.IdentityServer\.exe"  run'
-}
-
-if ($instructions.StopScheduler) {
-  Find-And-Stop-Process `
-    -ProcessName "iisexpress.exe" `
-    -Command 'iisexpress\.exe"  /config:".*?AdInsure\.Scheduler\\config\\applicationhost\.config" /site:"Scheduler\.Web" /apppool:"Scheduler\.Web AppPool"'     
-}
+$startingLocation = Get-Location
 
 try {
 
-  Push-Location
+  $instructions = @{
+    ValidatePlatformVersion = $false
+    ValidateImplementationMasterBranch = $false
+    StopAdInsureServer = $false
+    StopAngularClient = $false
+    StopIdentityServer = $false
+    StopScheduler = $false
+    BuildAdInsureServer = $false
+    RestoreDatabase = $false
+    BuildImplementation = $false
+    ExecuteImplementationDatabaseScripts = $false
+    InstallImplementationNodePackages = $false
+    ImportCSV = $false
+    StartIdentityServer = $false
+    StartAdInsureServer = $false
+    ValidateWorkspace = $false
+    PublishWorkspace = $false
+    ExecuteImplementationPostPublishDatabaseScripts = $false
+    InstallAngularNodePackages = $false
+    StartAngularClient = $false
+  }
+
+  if ($PublishOnly) {
+    $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.ValidateWorkspace = $true
+    $instructions.PublishWorkspace = $true
+  }
+
+  if ($BuildDotNetOnly) {
+    $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.StopAdInsureServer = $true
+    $instructions.StopIdentityServer = $true
+    $instructions.StopScheduler = $true
+    $instructions.BuildAdInsureServer = $true
+    $instructions.BuildImplementation = $true
+    $instructions.StartIdentityServer = $true
+    $instructions.StartAdInsureServer = $true
+  }
+
+  if ($BuildImplementationOnly) {
+    $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.StopAdInsureServer = $true
+    $instructions.StopScheduler = $true
+    $instructions.BuildImplementation = $true
+    $instructions.StartAdInsureServer = $true
+  }
+
+  if ($StartServersOnly) {
+    $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.StopAdInsureServer = $true
+    $instructions.StopIdentityServer = $true
+    $instructions.StopAngularClient = $true
+    $instructions.StartIdentityServer = $true
+    $instructions.StartAdInsureServer = $true
+    $instructions.StartAngularClient = $true
+  }
+
+  if (All-Values-Are @($PublishOnly, $BuildDotNetOnly, $StartServersOnly, $BuildImplementationOnly) -Value $false) {
+    Set-All-Values $instructions -Value $true
+  }
+
+  if ($DontValidatePlatformVersion) {
+    $instructions.ValidatePlatformVersion = $false
+  }
+
+  if ($DontValidateImplementationMasterBranch) {
+    $instructions.ValidateImplementationMasterBranch = $false
+  }
+
+  if (!(Test-Path $Root)) {
+    Write-Error "Directory $Root does not exist!" -ErrorAction Stop
+  }
+
+  $implementationDir = [io.path]::combine($Root, "implementation")
+  $implementationConfigurationDir = [io.path]::combine($implementationDir, "configuration")
+  $monoDir = [io.path]::combine($Root, "mono")
+  $monoClientDir = [io.path]::combine($monoDir, "client")
+  $monoConfDir = [io.path]::combine($monoDir, "server", "AdInsure.Server", "conf")
+  $adiEnvDir = [io.path]::combine($implementationDir, ".adi", "environments")
+  $monoImplSettingsJsonFilename = [io.path]::combine($monoConfDir, "implSettings.json")
+
+  $implEnvLocalJsonFilename = $null
+  if ($Layer -ne "generali-hu") {
+    $implEnvLocalJsonFilename = "environment.local.$Layer.json"
+  } else {
+    $implEnvLocalJsonFilename = "environment.local.json"
+  }
+  $implEnvLocalJsonPath = [io.path]::combine($adiEnvDir, $implEnvLocalJsonFilename)
+
+  if (!(Test-Path $implementationDir) -or !(Test-Path $monoDir) -or !(Test-Path $monoClientDir) -or !(Test-Path $implementationConfigurationDir)) {
+    Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
+  }
+
+  # Validate-Impl-Env-Local-Json `
+  #   -Layer $Layer `
+  #   -ImplEnvLocalJsonPath $implEnvLocalJsonPath `
+  #   -MonoImplSettingsJsonFilename $monoImplSettingsJsonFilename
+
+  if ($instructions.ValidateImplementationMasterBranch) {
+    Validate-Implementation-Master-Branch `
+      -ImplementationDir $implementationDir `
+      -MasterBranchName $MasterBranchName
+  }
+
+  if ($instructions.ValidatePlatformVersion) {
+    Validate-Platform-Version `
+      -MonoDir $monoDir `
+      -ImplementationDir $implementationDir
+  }
+
+  if ($instructions.StopAdInsureServer) {
+    Find-And-Stop-Process `
+      -ProcessName "AdInsure.Server.exe" `
+      -Command 'AdInsure\.Server\.exe.*?run --urls http://\*:60000'  
+  }
+
+  if ($instructions.StopAngularClient) {
+    Find-And-Stop-Process `
+      -ProcessName "node.exe" `
+      -Command 'node\.exe.*?@angular\\cli\\bin\\ng.*?serve'
+  }
+
+  if ($instructions.StopIdentityServer) {
+    Find-And-Stop-Process `
+      -ProcessName "AdInsure.IdentityServer.exe" `
+      -Command 'AdInsure\.IdentityServer\.exe"  run'
+  }
+
+  if ($instructions.StopScheduler) {
+    Find-And-Stop-Process `
+      -ProcessName "iisexpress.exe" `
+      -Command 'iisexpress\.exe"  /config:".*?AdInsure\.Scheduler\\config\\applicationhost\.config" /site:"Scheduler\.Web" /apppool:"Scheduler\.Web AppPool"'     
+  }
+
   Set-Location $Root
 
   if ($Clean) {
     Remove-Node-Modules
 
-    try {
+    Write-Output "Cleaning mono"
 
-      Write-Output "Cleaning mono"
-
-      Push-Location
-      Set-Location .\mono
-
-      try {
-        # Run-Command-Stop-On-Error "Move-Item -Path identityServer\src\AdInsure.IdentityServer\appsettings.json -Destination .. -Force"
-        # Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\databaseConfiguration.json -Destination .. -Force"
-        Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\implSettings.json -Destination .. -Force"
-
-        $gitStashOutput = Run-Command "git stash --include-untracked"
-        Write-Output $gitStashOutput
-
-        Run-Command "echo no | git clean -fdx"
-        Run-Command "git reset --hard"
-
-        if (!($gitStashOutput -match "No local changes to save")) {
-          Run-Command-Stop-On-Error "git stash pop"
-        }
-      } finally {
-        # Run-Command-Stop-On-Error "Move-Item -Destination identityServer\src\AdInsure.IdentityServer -Path ..\appsettings.json -Force"
-        # Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\databaseConfiguration.json -Force"
-        Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\implSettings.json -Force"
-      }
-
-    } finally {
-      Pop-Location  
-    }
+    Set-Location $monoDir
 
     try {
+      # Run-Command-Stop-On-Error "Move-Item -Path identityServer\src\AdInsure.IdentityServer\appsettings.json -Destination .. -Force"
+      # Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\databaseConfiguration.json -Destination .. -Force"
+      Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\implSettings.json -Destination .. -Force"
 
-      Write-Output "Cleaning implementation"
+      $gitStashOutput = Run-Command "git stash --include-untracked"
+      Write-Output $gitStashOutput
 
-      Push-Location
-      Set-Location .\implementation
+      Run-Command "echo no | git clean -fdx"
+      Run-Command "git reset --hard"
 
-      try {
-        # Run-Command-Stop-On-Error "Move-Item -Path .adi\environments\environment.local.json -Destination .. -Force"
-
-        $gitStashOutput = Run-Command "git stash --include-untracked"
-        Write-Output $gitStashOutput
-    
-        Run-Command "echo no | git clean -fdx"
-        Run-Command "git reset --hard"
-    
-        if (!($gitStashOutput -match "No local changes to save")) {
-          Run-Command-Stop-On-Error "git stash pop"
-        }
-      } finally {
-        # Run-Command-Stop-On-Error "Move-Item -Destination .adi\environments -Path ..\environment.local.json -Force"
+      if (!($gitStashOutput -match "No local changes to save")) {
+        Run-Command-Stop-On-Error "git stash pop"
       }
-
     } finally {
-      Pop-Location  
+      # Run-Command-Stop-On-Error "Move-Item -Destination identityServer\src\AdInsure.IdentityServer -Path ..\appsettings.json -Force"
+      # Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\databaseConfiguration.json -Force"
+      Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\implSettings.json -Force"
     }
+
+    Write-Output "Cleaning implementation"
+
+    Set-Location $implementationDir
+
+    # try {
+      # Run-Command-Stop-On-Error "Move-Item -Path .adi\environments\environment.local.json -Destination .. -Force"
+
+    $gitStashOutput = Run-Command "git stash --include-untracked"
+    Write-Output $gitStashOutput
+
+    Run-Command "echo no | git clean -fdx"
+    Run-Command "git reset --hard"
+
+    if (!($gitStashOutput -match "No local changes to save")) {
+      Run-Command-Stop-On-Error "git stash pop"
+    }
+    # } finally {
+      # Run-Command-Stop-On-Error "Move-Item -Destination .adi\environments -Path ..\environment.local.json -Force"
+    # }
 
     Start-Server-In-Background `
       -InitializationScript $sharedFunctions `
@@ -529,111 +525,101 @@ try {
     #   -Retry
   }
 
-  try {
+  Set-Location $monoDir
 
-    Push-Location
-    Set-Location .\mono
-
-    if ($instructions.BuildAdInsureServer) {
-      Run-Command-Stop-On-Error ".\build.ps1 -Build -SkipBasic"
-    }
-    
-    if ($instructions.RestoreDatabase) {
+  if ($instructions.BuildAdInsureServer) {
+    Run-Command-Stop-On-Error ".\build.ps1 -Build -SkipBasic"
+  }
+  
+  if ($instructions.RestoreDatabase) {
+    if ($Layer -ne "generali-hu") {
       Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType Oracle -SkipBasic -DatabaseOracleSID ORCLCDB"
+    } else {
+      Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType MSSQL -SkipBasic"
     }
-
-  } finally {
-    Pop-Location  
   }
 
-  try {
+  Set-Location $implementationDir
 
-    Push-Location
-    Set-Location .\implementation
-
-    if ($instructions.BuildImplementation) {
-      Run-Command-Stop-On-Error ".\build.ps1 -Build -TargetLayer $Layer"
-    }
-    
-    if ($instructions.ExecuteImplementationDatabaseScripts) {
-      Run-Command-Stop-On-Error ".\build.ps1 -ExecuteScripts -TargetLayer $Layer"
-    }
-    
-    if ($instructions.InstallImplementationNodePackages) {
-      Run-Command-Stop-On-Error "yarn install"
-    }
-
-    if (($Layer -like "hr") -and ($instructions.ImportCSV)) {
-      Run-Command-Stop-On-Error ".\build.ps1 -ImportCSV"
-    }
-
-    if ($instructions.StartIdentityServer) {
-      Start-Server-In-Background `
-        -Command ".\build.ps1 -RunIS" `
-        -SuccessCheck "Hosting started" `
-        -Dir $monoDir `
-        -InitializationScript $sharedFunctions `
-        -ErrorCheck "Unable to start Kestrel\."
-    }
-
-    if ($instructions.StartAdInsureServer) {
-      Start-Server-In-Background `
-        -Command ".\build.ps1 -RunServer" `
-        -SuccessCheck "AdInsure is initialized and ready to use\." `
-        -Dir $monoDir `
-        -InitializationScript $sharedFunctions
-    }
-
-    if ($instructions.ValidateWorkspace) {
-      Run-Command-Stop-On-Error "yarn run validate-workspace -e environment.local.$Layer.json" #-CommandOutput ([ref]$validateWorkspaceOutput)
-    }
-    
-    if ($instructions.PublishWorkspace) {
-      do {
-
-        $runAgain = $false
-        $publishWorkspaceOutput = $null
-        Run-Command "yarn run publish-workspace -e environment.local.$Layer.json" -CommandOutput ([ref]$publishWorkspaceOutput)
-
-        if ($publishWorkspaceOutput -match "\[ERROR\].*?Invocation of script 'Publish workspace' failed.*?Token exchange failed.*?TimeoutError") {
-          $runAgain = $true
-        }
-        elseif ($LASTEXITCODE -ne 0) {
-          Write-Error "Publish Workspace FAILED!" -ErrorAction Stop
-        }
-      } while ($runAgain)
-    }
-    
-    if ($instructions.ExecuteImplementationPostPublishDatabaseScripts) {
-      Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
-    }
-
-  } finally {
-    Pop-Location  
+  if ($instructions.BuildImplementation) {
+    Run-Command-Stop-On-Error ".\build.ps1 -Build -TargetLayer $Layer"
   }
 
-  try {
+  # Write-Output "Current location before fail - $(Get-Location)"
+  # Write-Error "FAILED!" -ErrorAction Stop
+  
+  if ($instructions.ExecuteImplementationDatabaseScripts) {
+    Run-Command-Stop-On-Error ".\build.ps1 -ExecuteScripts -TargetLayer $Layer"
+  }
+  
+  if ($instructions.InstallImplementationNodePackages) {
+    Run-Command-Stop-On-Error "yarn install"
+  }
 
-    Push-Location
-    Set-Location .\mono\client
+  if (($Layer -like "hr") -and ($instructions.ImportCSV)) {
+    Run-Command-Stop-On-Error ".\build.ps1 -ImportCSV"
+  }
 
-    if ($instructions.InstallAngularNodePackages) {
-      Run-Command-Stop-On-Error "yarn install"
-    }
-    
-    if ($instructions.StartAngularClient) {
-      Start-Server-In-Background `
-        -Command "yarn run start" `
-        -SuccessCheck "Compiled successfully\." `
-        -Dir $monoClientDir `
-        -InitializationScript $sharedFunctions
-    }
-    
-  } finally {
-    Pop-Location  
-  }  
+  if ($instructions.StartIdentityServer) {
+    Start-Server-In-Background `
+      -Command ".\build.ps1 -RunIS" `
+      -SuccessCheck "Hosting started" `
+      -Dir $monoDir `
+      -InitializationScript $sharedFunctions `
+      -ErrorCheck "Unable to start Kestrel\."
+  }
+
+  if ($instructions.StartAdInsureServer) {
+    Start-Server-In-Background `
+      -Command ".\build.ps1 -RunServer" `
+      -SuccessCheck "AdInsure is initialized and ready to use\." `
+      -Dir $monoDir `
+      -InitializationScript $sharedFunctions
+  }
+
+  if ($instructions.ValidateWorkspace) {
+    Run-Command-Stop-On-Error "yarn run validate-workspace -e $implEnvLocalJsonFilename" #-CommandOutput ([ref]$validateWorkspaceOutput)
+  }
+  
+  if ($instructions.PublishWorkspace) {
+
+    Run-Command "yarn run publish-workspace -e $implEnvLocalJsonFilename" # -CommandOutput ([ref]$publishWorkspaceOutput)
+
+
+    # do {
+
+    #   $runAgain = $false
+    #   $publishWorkspaceOutput = $null
+      
+
+    #   if ($publishWorkspaceOutput -match "\[ERROR\].*?Invocation of script 'Publish workspace' failed.*?Token exchange failed.*?TimeoutError") {
+    #     $runAgain = $true
+    #   }
+    #   elseif ($LASTEXITCODE -ne 0) {
+    #     Write-Error "Publish Workspace FAILED!" -ErrorAction Stop
+    #   }
+    # } while ($runAgain)
+  }
+  
+  if ($instructions.ExecuteImplementationPostPublishDatabaseScripts -and ($Layer -ne "generali-hu")) {
+    Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
+  }
+
+  Set-Location $monoClientDir
+
+  if ($instructions.InstallAngularNodePackages) {
+    Run-Command-Stop-On-Error "yarn install"
+  }
+  
+  if ($instructions.StartAngularClient) {
+    Start-Server-In-Background `
+      -Command "yarn run start" `
+      -SuccessCheck "Compiled successfully\." `
+      -Dir $monoClientDir `
+      -InitializationScript $sharedFunctions
+  }
 
 } finally {
-  Pop-Location  
+  Set-Location $startingLocation
 }
 
