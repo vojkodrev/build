@@ -3,7 +3,7 @@ param(
   [string]
   $Root = "c:\code\sava",
   
-  [ValidateSet("hr", "si", "generali-hu")]
+  [ValidateSet("hr", "si", "generali-hu", "signal")]
   [string]
   $Layer = "hr",
   
@@ -110,7 +110,7 @@ function Start-Server-In-Background {
 
       Receive-Job $job -OutVariable jOut -ErrorVariable jError
 
-      if (($job.JobStateInfo.State -eq "Failed") -or ($ErrorCheck -and ($jError -match $ErrorCheck)) -or ($ErrorCheck -and ($jOut -match $ErrorCheck))) {
+      if (($job.JobStateInfo.State -eq "Failed") -or ($job.JobStateInfo.State -eq "Stopped") -or ($ErrorCheck -and ($jError -match $ErrorCheck)) -or ($ErrorCheck -and ($jOut -match $ErrorCheck))) {
         if ($Retry) {
           $runAgain = $true
         } else {
@@ -402,7 +402,7 @@ try {
   $monoImplSettingsJsonFilename = [io.path]::combine($monoConfDir, "implSettings.json")
 
   $implEnvLocalJsonFilename = $null
-  if ($Layer -ne "generali-hu") {
+  if (($Layer -ne "generali-hu") -and ($Layer -ne "signal")) {
     $implEnvLocalJsonFilename = "environment.local.$Layer.json"
   } else {
     $implEnvLocalJsonFilename = "environment.local.json"
@@ -532,11 +532,11 @@ try {
   }
   
   if ($instructions.RestoreDatabase) {
-    if ($Layer -ne "generali-hu") {
+    if (($Layer -ne "generali-hu") -and ($Layer -ne "signal")) {
       Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType Oracle -SkipBasic -DatabaseOracleSID ORCLCDB"
     } else {
       Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType MSSQL -SkipBasic"
-    }
+    } 
   }
 
   Set-Location $implementationDir
@@ -583,7 +583,7 @@ try {
   
   if ($instructions.PublishWorkspace) {
 
-    Run-Command "yarn run publish-workspace -e $implEnvLocalJsonFilename" # -CommandOutput ([ref]$publishWorkspaceOutput)
+    Run-Command-Stop-On-Error "yarn run publish-workspace -e $implEnvLocalJsonFilename" # -CommandOutput ([ref]$publishWorkspaceOutput)
 
 
     # do {
@@ -601,7 +601,7 @@ try {
     # } while ($runAgain)
   }
   
-  if ($instructions.ExecuteImplementationPostPublishDatabaseScripts -and ($Layer -ne "generali-hu")) {
+  if ($instructions.ExecuteImplementationPostPublishDatabaseScripts -and ($Layer -ne "generali-hu") -and ($Layer -ne "signal")) {
     Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
   }
 
