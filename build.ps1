@@ -17,6 +17,7 @@ param(
   [switch]$PublishOnly = $false,
   [switch]$DontValidatePlatformVersion = $false,
   [switch]$DontValidateImplementationMasterBranch = $false,
+  [switch]$DontValidateWorkspace = $false,
   [switch]$StartServersOnly = $false
 )
 
@@ -389,6 +390,10 @@ try {
     $instructions.ValidateImplementationMasterBranch = $false
   }
 
+  if ($DontValidateWorkspace) {
+    $instructions.ValidateWorkspace = $false
+  }
+
   if (!(Test-Path $Root)) {
     Write-Error "Directory $Root does not exist!" -ErrorAction Stop
   }
@@ -516,7 +521,8 @@ try {
       -CleanUpCommand "docker rm -f amq" `
       -Command 'docker run -p 61616:61616 -p 8161:8161 --platform=linux --name amq rmohr/activemq:5.15.9' `
       -Retry `
-      -SuccessCheck "INFO \| jolokia-agent: Using policy access restrictor classpath:\/jolokia-access.xml"
+      -SuccessCheck "INFO \| jolokia-agent: Using policy access restrictor classpath:\/jolokia-access.xml" `
+      -ErrorCheck "encountered an error during hcsshim::System::waitBackground: failure in a Windows system call: The virtual machine or container with the specified identifier is not running"
 
     # Start-Server-In-Background `
     #   -InitializationScript $sharedFunctions `
@@ -583,22 +589,24 @@ try {
   
   if ($instructions.PublishWorkspace) {
 
-    Run-Command-Stop-On-Error "yarn run publish-workspace -e $implEnvLocalJsonFilename" # -CommandOutput ([ref]$publishWorkspaceOutput)
+    do {
 
-
-    # do {
-
-    #   $runAgain = $false
-    #   $publishWorkspaceOutput = $null
+      $runAgain = $false
+      $publishWorkspaceOutput = $null
       
+      Run-Command "yarn run publish-workspace -e $implEnvLocalJsonFilename" -CommandOutput ([ref]$publishWorkspaceOutput)
 
-    #   if ($publishWorkspaceOutput -match "\[ERROR\].*?Invocation of script 'Publish workspace' failed.*?Token exchange failed.*?TimeoutError") {
-    #     $runAgain = $true
-    #   }
-    #   elseif ($LASTEXITCODE -ne 0) {
-    #     Write-Error "Publish Workspace FAILED!" -ErrorAction Stop
-    #   }
-    # } while ($runAgain)
+      if (($publishWorkspaceOutput -match "\[ERROR\].*?Invocation of script 'Publish workspace' failed.*?Token exchange failed.*?TimeoutError") `
+        -or ($publishWorkspaceOutput -match "failed, reason: socket hang up") `
+        -or ($publishWorkspaceOutput -match "Could not create ADO\.NET connection for transaction") `
+      ) {
+
+        $runAgain = $true
+      }
+      elseif ($LASTEXITCODE -ne 0) {
+        Write-Error "Publish Workspace FAILED!" -ErrorAction Stop
+      }
+    } while ($runAgain)
   }
   
   if ($instructions.ExecuteImplementationPostPublishDatabaseScripts -and ($Layer -ne "generali-hu") -and ($Layer -ne "signal")) {
