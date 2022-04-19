@@ -126,6 +126,10 @@ function Start-Server-In-Background {
       if ($jOut -match $SuccessCheck) {
         break
       }
+
+      if ($jError -match $SuccessCheck) {
+        break
+      }
     }
   } while ($runAgain)
 }
@@ -400,6 +404,7 @@ try {
 
   $implementationDir = [io.path]::combine($Root, "implementation")
   $implementationConfigurationDir = [io.path]::combine($implementationDir, "configuration")
+  $printoutAssetsDir = [io.path]::combine($implementationDir, "printout-assets")
   $monoDir = [io.path]::combine($Root, "mono")
   $monoClientDir = [io.path]::combine($monoDir, "client")
   $monoConfDir = [io.path]::combine($monoDir, "server", "AdInsure.Server", "conf")
@@ -462,6 +467,22 @@ try {
   Set-Location $Root
 
   if ($Clean) {
+
+
+    $dockerService = Get-Service docker
+
+    # if ($dockerService.Status -eq "Running") {
+    Write-Output "Stopping docker"
+    Stop-Service $dockerService
+    # }
+
+    # if ($dockerService.Status -eq "Stopped") {
+    Write-Output "Starting docker"
+    Start-Service $dockerService
+    # }
+
+    # Run-Command-Stop-On-Error "docker start db_mssql_dev"
+
     Remove-Node-Modules
 
     Write-Output "Cleaning mono"
@@ -507,6 +528,22 @@ try {
     # } finally {
       # Run-Command-Stop-On-Error "Move-Item -Destination .adi\environments -Path ..\environment.local.json -Force"
     # }
+
+    if (!(Test-Path -Path $printoutAssetsDir)) {
+      New-Item -Path $printoutAssetsDir -ItemType Directory
+    }
+
+    Start-Server-In-Background `
+      -InitializationScript $sharedFunctions `
+      -CleanUpCommand "docker rm -f db_mssql_dev" `
+      -Command 'docker run -p 1433:1433 --name db_mssql_dev -m 3g registry.adacta-fintech.com/adinsure/mono/ops/mssql:6-latest-prepublished-ltsc2019' `
+      -SuccessCheck "VERBOSE: Started SQL Server"
+
+    Start-Server-In-Background `
+      -InitializationScript $sharedFunctions `
+      -CleanUpCommand "docker rm -f signal_pdf" `
+      -Command "docker run -p 9423:9423 --name signal_pdf -v `"${printoutAssetsDir}:/assets/printout-assets`" --env JAVA_OPTIONS=`"-Xmx2g -Dcom.realobjects.pdfreactor.webservice.securitySettings.defaults.allowFileSystemAccess=true`" --platform=linux realobjects/pdfreactor:10" `
+      -SuccessCheck "INFO: Started @\d+ms"
 
     Start-Server-In-Background `
       -InitializationScript $sharedFunctions `
