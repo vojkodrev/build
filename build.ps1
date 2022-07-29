@@ -14,6 +14,7 @@ param(
 
   [switch]$BuildDotNetOnly = $false,
   [switch]$BuildImplementationOnly = $false,
+  [switch]$InstallImplementationNodePackagesOnly = $false,
   [switch]$PublishOnly = $false,
   [switch]$DontValidatePlatformVersion = $false,
   [switch]$DontValidateImplementationMasterBranch = $false,
@@ -55,12 +56,21 @@ function Run-Command-Stop-On-Error {
     [Parameter(Mandatory=$true)]
     [string]$Command,
 
-    [string]$Description
+    [string]$Description,
+
+    [ref]$CommandOutput
   )
 
-  Run-Command -Description $Description -Command $Command
+  $o = $null
 
-  if ($LASTEXITCODE -ne 0) {
+  Run-Command -Description $Description -Command $Command -CommandOutput ([ref]$o)
+  $commandLastExitCode = $LASTEXITCODE
+
+  if ($CommandOutput) {
+    $CommandOutput.Value = $o
+  }
+
+  if ($commandLastExitCode -ne 0) {
     Write-Error "FAILED!" -ErrorAction Stop
   }
 }
@@ -135,12 +145,17 @@ function Start-Server-In-Background {
 }
 
 function Remove-Node-Modules {
-  Write-Output "Removing node modules"
+  param(
+    [parameter(Mandatory=$true)]
+    [string]$Dir
+  )
 
-  Get-ChildItem -Path $Root -Filter node_modules -Recurse -ErrorAction SilentlyContinue -Force |
+  Write-Output "Removing node modules $Dir"
+
+  Get-ChildItem -Path $Dir -Filter node_modules -Recurse -ErrorAction SilentlyContinue -Force |
   ForEach-Object {
     $nodeModulesDir = $_.FullName
-    Run-Command "Remove-Item -Recurse -Force $nodeModulesDir"
+    Run-Command "Remove-Item -Recurse -Force `"$nodeModulesDir`""
   }
 }
 
@@ -317,6 +332,29 @@ function All-Values-Are {
   return $true
 }
 
+function Start-Adinsure-Server-In-Background {
+  param(
+    [parameter(Mandatory=$true)]
+    [string]$MonoDir,
+
+    [parameter(Mandatory=$true)]
+    [ScriptBlock]$InitializationScript
+  )
+
+  Start-Server-In-Background `
+    -Command ".\build.ps1 -RunServer" `
+    -SuccessCheck "AdInsure is initialized and ready to use\." `
+    -Dir $MonoDir `
+    -InitializationScript $InitializationScript
+}
+
+function Stop-Adinsure-Server {
+
+  Find-And-Stop-Process `
+    -ProcessName "AdInsure.Server.exe" `
+    -Command 'AdInsure\.Server\.exe.*?run --urls http://\*:60000' 
+}
+
 $startingLocation = Get-Location
 
 try {
@@ -371,6 +409,10 @@ try {
     $instructions.StartAdInsureServer = $true
   }
 
+  if ($InstallImplementationNodePackagesOnly) {
+    $instructions.InstallImplementationNodePackages = $true
+  }
+
   if ($StartServersOnly) {
     $instructions.ValidatePlatformVersion = $true
     $instructions.ValidateImplementationMasterBranch = $true
@@ -382,7 +424,7 @@ try {
     $instructions.StartAngularClient = $true
   }
 
-  if (All-Values-Are @($PublishOnly, $BuildDotNetOnly, $StartServersOnly, $BuildImplementationOnly) -Value $false) {
+  if (All-Values-Are @($PublishOnly, $BuildDotNetOnly, $StartServersOnly, $BuildImplementationOnly, $InstallImplementationNodePackagesOnly) -Value $false) {
     Set-All-Values $instructions -Value $true
   }
 
@@ -441,9 +483,7 @@ try {
   }
 
   if ($instructions.StopAdInsureServer) {
-    Find-And-Stop-Process `
-      -ProcessName "AdInsure.Server.exe" `
-      -Command 'AdInsure\.Server\.exe.*?run --urls http://\*:60000'  
+    Stop-Adinsure-Server
   }
 
   if ($instructions.StopAngularClient) {
@@ -469,21 +509,21 @@ try {
   if ($Clean) {
 
 
-    $dockerService = Get-Service docker
+    # $dockerService = Get-Service docker
 
-    # if ($dockerService.Status -eq "Running") {
-    Write-Output "Stopping docker"
-    Stop-Service $dockerService
-    # }
+    # # if ($dockerService.Status -eq "Running") {
+    # Write-Output "Stopping docker"
+    # Stop-Service $dockerService
+    # # }
 
-    # if ($dockerService.Status -eq "Stopped") {
-    Write-Output "Starting docker"
-    Start-Service $dockerService
-    # }
+    # # if ($dockerService.Status -eq "Stopped") {
+    # Write-Output "Starting docker"
+    # Start-Service $dockerService
+    # # }
 
     # Run-Command-Stop-On-Error "docker start db_mssql_dev"
 
-    Remove-Node-Modules
+    Remove-Node-Modules -Dir $Root
 
     Write-Output "Cleaning mono"
 
@@ -596,7 +636,20 @@ try {
   }
   
   if ($instructions.InstallImplementationNodePackages) {
-    Run-Command-Stop-On-Error "yarn install"
+    if ($InstallImplementationNodePackagesOnly) {
+      Remove-Node-Modules -Dir $implementationDir
+    }
+
+    do {
+      $runAgain = $false
+      $yarnInstallOutput = $null
+      
+      Run-Command-Stop-On-Error "yarn install" -CommandOutput ([ref]$yarnInstallOutput)
+
+      if ($yarnInstallOutput -match "Request failed.*?401 Unauthorized") {
+        $runAgain = $true
+      }
+    } while ($runAgain)
   }
 
   if (($Layer -like "hr") -and ($instructions.ImportCSV)) {
@@ -606,17 +659,19 @@ try {
   if ($instructions.StartIdentityServer) {
     Start-Server-In-Background `
       -Command ".\build.ps1 -RunIS" `
-      -SuccessCheck "Hosting started" `
+      -SuccessCheck "Using launch settings from \.\\identityServer\\src\\AdInsure\.IdentityServer\\Properties\\launchSettings\.json" `
       -Dir $monoDir `
       -InitializationScript $sharedFunctions `
       -ErrorCheck "Unable to start Kestrel\."
   }
 
   if ($instructions.StartAdInsureServer) {
-    Start-Server-In-Background `
-      -Command ".\build.ps1 -RunServer" `
-      -SuccessCheck "AdInsure is initialized and ready to use\." `
-      -Dir $monoDir `
+    
+    # Run-Command "docker stop db_mssql_dev"
+    # Run-Command "docker start db_mssql_dev"
+
+    Start-Adinsure-Server-In-Background `
+      -MonoDir $monoDir `
       -InitializationScript $sharedFunctions
   }
 
@@ -631,12 +686,22 @@ try {
       $runAgain = $false
       $publishWorkspaceOutput = $null
       
+      # TODO: remove command output and just use return
       Run-Command "yarn run publish-workspace -e $implEnvLocalJsonFilename" -CommandOutput ([ref]$publishWorkspaceOutput)
 
       if (($publishWorkspaceOutput -match "\[ERROR\].*?Invocation of script 'Publish workspace' failed.*?Token exchange failed.*?TimeoutError") `
         -or ($publishWorkspaceOutput -match "failed, reason: socket hang up") `
         -or ($publishWorkspaceOutput -match "Could not create ADO\.NET connection for transaction") `
       ) {
+
+        Stop-Adinsure-Server
+
+        Run-Command "docker stop db_mssql_dev"
+        Run-Command "docker start db_mssql_dev"
+
+        Start-Adinsure-Server-In-Background `
+          -MonoDir $monoDir `
+          -InitializationScript $sharedFunctions
 
         $runAgain = $true
       }
