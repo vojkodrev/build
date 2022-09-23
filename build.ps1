@@ -28,9 +28,7 @@ $sharedFunctions = {
       [Parameter(Mandatory=$true)]
       [string]$Command,
   
-      [string]$Description,
-
-      [ref]$CommandOutput
+      [string]$Description
     )
   
     if ($Description) {
@@ -40,11 +38,7 @@ $sharedFunctions = {
     $currentLocation = Get-Location
     Write-Output "$currentLocation> $Command"
 
-    Invoke-Expression $Command | Tee-Object -Variable ieo
-
-    if ($CommandOutput) {
-      $CommandOutput.Value = $ieo
-    }
+    Invoke-Expression $Command
   }
 }
 
@@ -56,21 +50,12 @@ function Run-Command-Stop-On-Error {
     [Parameter(Mandatory=$true)]
     [string]$Command,
 
-    [string]$Description,
-
-    [ref]$CommandOutput
+    [string]$Description
   )
 
-  $o = $null
+  Run-Command -Description $Description -Command $Command
 
-  Run-Command -Description $Description -Command $Command -CommandOutput ([ref]$o)
-  $commandLastExitCode = $LASTEXITCODE
-
-  if ($CommandOutput) {
-    $CommandOutput.Value = $o
-  }
-
-  if ($commandLastExitCode -ne 0) {
+  if ($LASTEXITCODE -ne 0) {
     Write-Error "FAILED!" -ErrorAction Stop
   }
 }
@@ -97,7 +82,7 @@ function Start-Server-In-Background {
 
   do {
     if ($CleanUpCommand) {
-      Run-Command-Stop-On-Error $CleanUpCommand
+      Run-Command $CleanUpCommand
     }
 
     $runAgain = $false
@@ -577,7 +562,9 @@ try {
       -InitializationScript $sharedFunctions `
       -CleanUpCommand "docker rm -f db_mssql_dev" `
       -Command 'docker run -p 1433:1433 --name db_mssql_dev -m 3g registry.adacta-fintech.com/adinsure/mono/ops/mssql:6-latest-prepublished-ltsc2019' `
-      -SuccessCheck "VERBOSE: Started SQL Server"
+      -SuccessCheck "VERBOSE: Started SQL Server" `
+      -Retry `
+      -ErrorCheck "The requested resource is in use"
 
     Start-Server-In-Background `
       -InitializationScript $sharedFunctions `
@@ -596,7 +583,7 @@ try {
     Start-Server-In-Background `
       -InitializationScript $sharedFunctions `
       -CleanUpCommand "docker rm -f amq" `
-      -Command 'docker run -p 61616:61616 -p 8161:8161 --platform=linux --name amq rmohr/activemq:5.15.9' `
+      -Command 'docker run -p 61616:61616 -p 8161:8161 --platform=linux -m 5g --name amq --env ACTIVEMQ_OPTS="-Xms4g -Xmx5g -DXmx=1024m -DXss=600k" rmohr/activemq:5.15.9' `
       -Retry `
       -SuccessCheck "INFO \| jolokia-agent: Using policy access restrictor classpath:\/jolokia-access.xml" `
       -ErrorCheck "encountered an error during hcsshim::System::waitBackground: failure in a Windows system call: The virtual machine or container with the specified identifier is not running"
@@ -640,16 +627,21 @@ try {
       Remove-Node-Modules -Dir $implementationDir
     }
 
-    do {
-      $runAgain = $false
-      $yarnInstallOutput = $null
+    # do {
+    #   $runAgain = $false
+      # $yarnInstallOutput = $null
       
-      Run-Command-Stop-On-Error "yarn install" -CommandOutput ([ref]$yarnInstallOutput)
+    # TODO VojkoD: test this by deleting .npmrc in user dir
 
-      if ($yarnInstallOutput -match "Request failed.*?401 Unauthorized") {
-        $runAgain = $true
-      }
-    } while ($runAgain)
+      #Run-Command "yarn install" -OutVariable yarnInstallOutput -ErrorVariable yarnInstallErrorOutput #-CommandOutput ([ref]$yarnInstallOutput)
+      Run-Command-Stop-On-Error "yarn install"
+
+    #   if (($yarnInstallOutput -match "Request failed.*?401 Unauthorized") -or `
+    #     ($yarnInstallErrorOutput -match "Request failed.*?401 Unauthorized") `
+    #   ) {
+    #     $runAgain = $true
+    #   }
+    # } while ($runAgain)
   }
 
   if (($Layer -like "hr") -and ($instructions.ImportCSV)) {
@@ -681,34 +673,42 @@ try {
   
   if ($instructions.PublishWorkspace) {
 
-    do {
+    # do {
 
-      $runAgain = $false
-      $publishWorkspaceOutput = $null
+    #   $runAgain = $false
+    #   $publishWorkspaceOutput = $null
       
-      # TODO: remove command output and just use return
-      Run-Command "yarn run publish-workspace -e $implEnvLocalJsonFilename" -CommandOutput ([ref]$publishWorkspaceOutput)
+    Run-Command-Stop-On-Error "yarn run publish-workspace -e $implEnvLocalJsonFilename" | Tee-Object -Variable publishWorkspaceOutput # -CommandOutput ([ref]$publishWorkspaceOutput)
+    #   $publishWorkspaceExitCode = $LASTEXITCODE
 
-      if (($publishWorkspaceOutput -match "\[ERROR\].*?Invocation of script 'Publish workspace' failed.*?Token exchange failed.*?TimeoutError") `
-        -or ($publishWorkspaceOutput -match "failed, reason: socket hang up") `
-        -or ($publishWorkspaceOutput -match "Could not create ADO\.NET connection for transaction") `
-      ) {
+    #   if (($publishWorkspaceOutput -match "\[ERROR\].*?Invocation of script 'Publish workspace' failed.*?Token exchange failed.*?TimeoutError") `
+    #     -or ($publishWorkspaceOutput -match "failed, reason: socket hang up") `
+    #     -or ($publishWorkspaceOutput -match "Could not create ADO\.NET connection for transaction") `
+    #   ) {
 
-        Stop-Adinsure-Server
+    #     Stop-Adinsure-Server
 
-        Run-Command "docker stop db_mssql_dev"
-        Run-Command "docker start db_mssql_dev"
+    #     Run-Command "docker stop db_mssql_dev"
+    #     Run-Command "docker start db_mssql_dev"
 
-        Start-Adinsure-Server-In-Background `
-          -MonoDir $monoDir `
-          -InitializationScript $sharedFunctions
+    #     Start-Adinsure-Server-In-Background `
+    #       -MonoDir $monoDir `
+    #       -InitializationScript $sharedFunctions
 
-        $runAgain = $true
-      }
-      elseif ($LASTEXITCODE -ne 0) {
-        Write-Error "Publish Workspace FAILED!" -ErrorAction Stop
-      }
-    } while ($runAgain)
+    #     $runAgain = $true
+    #   }
+    #   elseif ($publishWorkspaceExitCode -ne 0) {
+    #     Write-Error "Publish Workspace FAILED!" -ErrorAction Stop
+    #   }
+    # } while ($runAgain)
+
+    if ($publishWorkspaceOutput -match "MessageRoute") {
+      Stop-Adinsure-Server
+
+      Start-Adinsure-Server-In-Background `
+        -MonoDir $monoDir `
+        -InitializationScript $sharedFunctions
+    }
   }
   
   if ($instructions.ExecuteImplementationPostPublishDatabaseScripts -and ($Layer -ne "generali-hu") -and ($Layer -ne "signal")) {
