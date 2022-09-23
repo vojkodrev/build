@@ -1,0 +1,17 @@
+{
+  "name": "get-all-tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "get-all-tests.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "acorn": "^8.8.0",
+    "commander": "^9.4.0",
+    "glob": "^8.0.3",
+    "recursive-iterator": "^3.3.0"
+  }
+}
