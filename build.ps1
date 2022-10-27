@@ -246,8 +246,9 @@ function Validate-Platform-Version {
     Set-Location $MonoDir
   
     $requiredPlatformVersion = [IO.File]::ReadAllText([io.path]::combine($ImplementationDir, "PLATFORM_VERSION"))
-    $correctTag = git tag --points-at HEAD | Select-String $requiredPlatformVersion
-    if (!$correctTag) {
+    # $correctTag = git tag --points-at HEAD | Select-String $requiredPlatformVersion
+    $correctBranch = git rev-parse --abbrev-ref HEAD | Select-String $requiredPlatformVersion
+    if (!$correctBranch) {
       Write-Error "Mono $requiredPlatformVersion is required" -ErrorAction Stop
     }
   
