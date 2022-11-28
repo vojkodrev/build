@@ -3,7 +3,7 @@ param(
   [string]
   $Root = "c:\code\sava",
   
-  [ValidateSet("hr", "si", "generali-hu", "signal")]
+  [ValidateSet("hr", "si", "generali-hu", "signal", "re")]
   [string]
   $Layer = "hr",
   
@@ -440,10 +440,10 @@ try {
   $monoImplSettingsJsonFilename = [io.path]::combine($monoConfDir, "implSettings.json")
 
   $implEnvLocalJsonFilename = $null
-  if (($Layer -ne "generali-hu") -and ($Layer -ne "signal")) {
-    $implEnvLocalJsonFilename = "environment.local.$Layer.json"
-  } else {
+  if (($Layer -eq "generali-hu") -or ($Layer -eq "signal") -or ($Layer -eq "re")) {
     $implEnvLocalJsonFilename = "environment.local.json"
+  } else {
+    $implEnvLocalJsonFilename = "environment.local.$Layer.json"
   }
   $implEnvLocalJsonPath = [io.path]::combine($adiEnvDir, $implEnvLocalJsonFilename)
 
@@ -599,14 +599,20 @@ try {
   Set-Location $monoDir
 
   if ($instructions.BuildAdInsureServer) {
-    Run-Command-Stop-On-Error ".\build.ps1 -Build -SkipBasic"
+    if ($Layer -ne "re") {
+      Run-Command-Stop-On-Error ".\build.ps1 -Build -SkipBasic"
+    } else {
+      Run-Command-Stop-On-Error ".\build.ps1 -Build"
+    }
   }
   
   if ($instructions.RestoreDatabase) {
-    if (($Layer -ne "generali-hu") -and ($Layer -ne "signal")) {
-      Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType Oracle -SkipBasic -DatabaseOracleSID ORCLCDB"
-    } else {
+    if (($Layer -eq "generali-hu") -or ($Layer -eq "signal")) {
       Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType MSSQL -SkipBasic"
+    } elseif ($Layer -eq "re") {
+      Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType MSSQL"
+    } else {
+      Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType Oracle -SkipBasic -DatabaseOracleSID ORCLCDB"
     } 
   }
 
@@ -712,7 +718,7 @@ try {
     }
   }
   
-  if ($instructions.ExecuteImplementationPostPublishDatabaseScripts -and ($Layer -ne "generali-hu") -and ($Layer -ne "signal")) {
+  if ($instructions.ExecuteImplementationPostPublishDatabaseScripts -and ($Layer -ne "generali-hu") -and ($Layer -ne "signal") -and ($Layer -ne "re")) {
     Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
   }
 
