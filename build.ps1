@@ -509,11 +509,13 @@ try {
 
     # Run-Command-Stop-On-Error "docker start db_mssql_dev"
 
-    Remove-Node-Modules -Dir $Root
+    # Remove-Node-Modules -Dir $Root
 
     Write-Output "Cleaning mono"
 
     Set-Location $monoDir
+
+    $gitCleanExcludeParam = "-e node_modules"
 
     try {
       # Run-Command-Stop-On-Error "Move-Item -Path identityServer\src\AdInsure.IdentityServer\appsettings.json -Destination .. -Force"
@@ -523,7 +525,7 @@ try {
       $gitStashOutput = Run-Command "git stash --include-untracked"
       Write-Output $gitStashOutput
 
-      Run-Command "echo no | git clean -fdx"
+      Run-Command "echo no | git clean -fdx $gitCleanExcludeParam"
       Run-Command "git reset --hard"
 
       if (!($gitStashOutput -match "No local changes to save")) {
@@ -545,7 +547,7 @@ try {
     $gitStashOutput = Run-Command "git stash --include-untracked"
     Write-Output $gitStashOutput
 
-    Run-Command "echo no | git clean -fdx"
+    Run-Command "echo no | git clean -fdx $gitCleanExcludeParam"
     Run-Command "git reset --hard"
 
     if (!($gitStashOutput -match "No local changes to save")) {
