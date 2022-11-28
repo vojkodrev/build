@@ -564,10 +564,10 @@ try {
     Start-Server-In-Background `
       -InitializationScript $sharedFunctions `
       -CleanUpCommand "docker rm -f db_mssql_dev" `
-      -Command 'docker run -p 1433:1433 --name db_mssql_dev -m 3g registry.adacta-fintech.com/adinsure/mono/ops/mssql:6-latest-prepublished-ltsc2019' `
-      -SuccessCheck "VERBOSE: Started SQL Server" `
+      -Command 'docker run -p 1433:1433 --name db_mssql_dev -m 3g registry.adacta-fintech.com/adinsure/mono/ops/mssql:empty' `
+      -SuccessCheck "SQL Server is now ready for client connections\. This is an informational message; no user action is required" `
       -Retry `
-      -ErrorCheck "The requested resource is in use"
+      -ErrorCheck "(The requested resource is in use)|(Error waiting for container: failed to shutdown container)"
 
     Start-Server-In-Background `
       -InitializationScript $sharedFunctions `
@@ -578,7 +578,7 @@ try {
     Start-Server-In-Background `
       -InitializationScript $sharedFunctions `
       -CleanUpCommand "docker rm -f es" `
-      -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --platform=linux --name es -h es elasticsearch:7.9.0' `
+      -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --platform=linux --name es -h es elasticsearch:7.16.2' `
       -Retry `
       -SuccessCheck "Active license is now \[BASIC\]; Security is disabled" `
       -ErrorCheck "failure in a Windows system call: The virtual machine or container with the specified identifier is not running"    
