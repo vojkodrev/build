@@ -213,6 +213,9 @@ function Validate-Impl-Env-Local-Json {
   } elseif ($Layer -eq "hr") {
     $requiredJsonTargetlayer = "sava-hr"
     $requiredJsonCurrency = "HRK"
+  } elseif ($Layer -eq "signal") {
+    $requiredJsonTargetlayer = "signal"
+    $requiredJsonCurrency = "HUF"
   } else {
     Write-Error "Unsupported layer $Layer during $ImplEnvLocalJsonPath validation" -ErrorAction Stop
   }
@@ -451,10 +454,10 @@ try {
     Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
   }
 
-  # Validate-Impl-Env-Local-Json `
-  #   -Layer $Layer `
-  #   -ImplEnvLocalJsonPath $implEnvLocalJsonPath `
-  #   -MonoImplSettingsJsonFilename $monoImplSettingsJsonFilename
+  Validate-Impl-Env-Local-Json `
+    -Layer $Layer `
+    -ImplEnvLocalJsonPath $implEnvLocalJsonPath `
+    -MonoImplSettingsJsonFilename $monoImplSettingsJsonFilename
 
   if ($instructions.ValidateImplementationMasterBranch) {
     Validate-Implementation-Master-Branch `
