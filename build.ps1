@@ -497,23 +497,6 @@ try {
 
   if ($Clean) {
 
-
-    # $dockerService = Get-Service docker
-
-    # # if ($dockerService.Status -eq "Running") {
-    # Write-Output "Stopping docker"
-    # Stop-Service $dockerService
-    # # }
-
-    # # if ($dockerService.Status -eq "Stopped") {
-    # Write-Output "Starting docker"
-    # Start-Service $dockerService
-    # # }
-
-    # Run-Command-Stop-On-Error "docker start db_mssql_dev"
-
-    # Remove-Node-Modules -Dir $Root
-
     Write-Output "Cleaning mono"
 
     Set-Location $monoDir
@@ -521,8 +504,6 @@ try {
     $gitCleanExcludeParam = "-e node_modules"
 
     try {
-      # Run-Command-Stop-On-Error "Move-Item -Path identityServer\src\AdInsure.IdentityServer\appsettings.json -Destination .. -Force"
-      # Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\databaseConfiguration.json -Destination .. -Force"
       Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\implSettings.json -Destination .. -Force"
 
       $gitStashOutput = Run-Command "git stash --include-untracked"
@@ -535,17 +516,12 @@ try {
         Run-Command-Stop-On-Error "git stash pop"
       }
     } finally {
-      # Run-Command-Stop-On-Error "Move-Item -Destination identityServer\src\AdInsure.IdentityServer -Path ..\appsettings.json -Force"
-      # Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\databaseConfiguration.json -Force"
       Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\implSettings.json -Force"
     }
 
     Write-Output "Cleaning implementation"
 
     Set-Location $implementationDir
-
-    # try {
-      # Run-Command-Stop-On-Error "Move-Item -Path .adi\environments\environment.local.json -Destination .. -Force"
 
     $gitStashOutput = Run-Command "git stash --include-untracked"
     Write-Output $gitStashOutput
@@ -556,9 +532,6 @@ try {
     if (!($gitStashOutput -match "No local changes to save")) {
       Run-Command-Stop-On-Error "git stash pop"
     }
-    # } finally {
-      # Run-Command-Stop-On-Error "Move-Item -Destination .adi\environments -Path ..\environment.local.json -Force"
-    # }
 
     if (!(Test-Path -Path $printoutAssetsDir)) {
       New-Item -Path $printoutAssetsDir -ItemType Directory
@@ -627,9 +600,6 @@ try {
     Run-Command-Stop-On-Error ".\build.ps1 -Build -TargetLayer $Layer"
   }
 
-  # Write-Output "Current location before fail - $(Get-Location)"
-  # Write-Error "FAILED!" -ErrorAction Stop
-  
   if ($instructions.ExecuteImplementationDatabaseScripts) {
     Run-Command-Stop-On-Error ".\build.ps1 -ExecuteScripts -TargetLayer $Layer"
   }
@@ -639,21 +609,7 @@ try {
       Remove-Node-Modules -Dir $implementationDir
     }
 
-    # do {
-    #   $runAgain = $false
-      # $yarnInstallOutput = $null
-      
-    # TODO VojkoD: test this by deleting .npmrc in user dir
-
-      #Run-Command "yarn install" -OutVariable yarnInstallOutput -ErrorVariable yarnInstallErrorOutput #-CommandOutput ([ref]$yarnInstallOutput)
-      Run-Command-Stop-On-Error "yarn install"
-
-    #   if (($yarnInstallOutput -match "Request failed.*?401 Unauthorized") -or `
-    #     ($yarnInstallErrorOutput -match "Request failed.*?401 Unauthorized") `
-    #   ) {
-    #     $runAgain = $true
-    #   }
-    # } while ($runAgain)
+    Run-Command-Stop-On-Error "yarn install"
   }
 
   if (($Layer -like "hr") -and ($instructions.ImportCSV)) {
@@ -670,10 +626,6 @@ try {
   }
 
   if ($instructions.StartAdInsureServer) {
-    
-    # Run-Command "docker stop db_mssql_dev"
-    # Run-Command "docker start db_mssql_dev"
-
     Start-Adinsure-Server-In-Background `
       -MonoDir $monoDir `
       -InitializationScript $sharedFunctions
@@ -685,34 +637,7 @@ try {
   
   if ($instructions.PublishWorkspace) {
 
-    # do {
-
-    #   $runAgain = $false
-    #   $publishWorkspaceOutput = $null
-      
     Run-Command-Stop-On-Error "yarn run publish-workspace -e $implEnvLocalJsonFilename" | Tee-Object -Variable publishWorkspaceOutput # -CommandOutput ([ref]$publishWorkspaceOutput)
-    #   $publishWorkspaceExitCode = $LASTEXITCODE
-
-    #   if (($publishWorkspaceOutput -match "\[ERROR\].*?Invocation of script 'Publish workspace' failed.*?Token exchange failed.*?TimeoutError") `
-    #     -or ($publishWorkspaceOutput -match "failed, reason: socket hang up") `
-    #     -or ($publishWorkspaceOutput -match "Could not create ADO\.NET connection for transaction") `
-    #   ) {
-
-    #     Stop-Adinsure-Server
-
-    #     Run-Command "docker stop db_mssql_dev"
-    #     Run-Command "docker start db_mssql_dev"
-
-    #     Start-Adinsure-Server-In-Background `
-    #       -MonoDir $monoDir `
-    #       -InitializationScript $sharedFunctions
-
-    #     $runAgain = $true
-    #   }
-    #   elseif ($publishWorkspaceExitCode -ne 0) {
-    #     Write-Error "Publish Workspace FAILED!" -ErrorAction Stop
-    #   }
-    # } while ($runAgain)
 
     if ($publishWorkspaceOutput -match "MessageRoute") {
       Stop-Adinsure-Server
