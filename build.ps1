@@ -501,15 +501,13 @@ try {
 
     Set-Location $monoDir
 
-    $gitCleanExcludeParam = "-e node_modules"
-
     try {
       Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\implSettings.json -Destination .. -Force"
 
       $gitStashOutput = Run-Command "git stash --include-untracked"
       Write-Output $gitStashOutput
 
-      Run-Command "echo no | git clean -fdx $gitCleanExcludeParam"
+      Run-Command "echo no | git clean -fdx -e node_modules"
       Run-Command "git reset --hard"
 
       if (!($gitStashOutput -match "No local changes to save")) {
@@ -526,7 +524,7 @@ try {
     $gitStashOutput = Run-Command "git stash --include-untracked"
     Write-Output $gitStashOutput
 
-    Run-Command "echo no | git clean -fdx $gitCleanExcludeParam"
+    Run-Command "echo no | git clean -fdx -e node_modules"
     Run-Command "git reset --hard"
 
     if (!($gitStashOutput -match "No local changes to save")) {
