@@ -11,11 +11,14 @@ param(
   $MasterBranchName = "origin/master",
 
   [switch]$Clean = $false,
+  [switch]$CleanNodeModules = $false,
 
   [switch]$BuildDotNetOnly = $false,
   [switch]$BuildImplementationOnly = $false,
   [switch]$InstallImplementationNodePackagesOnly = $false,
   [switch]$PublishOnly = $false,
+  [switch]$CleanESOnly = $false,
+  [switch]$ExecuteImplementationDatabaseScriptsOnly = $false,
   [switch]$DontValidatePlatformVersion = $false,
   [switch]$DontValidateImplementationMasterBranch = $false,
   [switch]$DontValidateWorkspace = $false,
@@ -351,10 +354,12 @@ try {
   $instructions = @{
     ValidatePlatformVersion = $false
     ValidateImplementationMasterBranch = $false
+    CleanES = $false
     StopAdInsureServer = $false
     StopAngularClient = $false
     StopIdentityServer = $false
     StopScheduler = $false
+    StopMockIntegrationService = $false
     BuildAdInsureServer = $false
     RestoreDatabase = $false
     BuildImplementation = $false
@@ -363,11 +368,18 @@ try {
     ImportCSV = $false
     StartIdentityServer = $false
     StartAdInsureServer = $false
+    StartMockIntegrationService = $false
     ValidateWorkspace = $false
     PublishWorkspace = $false
     ExecuteImplementationPostPublishDatabaseScripts = $false
     InstallAngularNodePackages = $false
     StartAngularClient = $false
+  }
+
+  if ($CleanESOnly) {
+    $instructions.CleanES = $true
+    $instructions.StopAdInsureServer = $true
+    $instructions.StartAdInsureServer = $true
   }
 
   if ($PublishOnly) {
@@ -413,7 +425,20 @@ try {
     $instructions.StartAngularClient = $true
   }
 
-  if (All-Values-Are @($PublishOnly, $BuildDotNetOnly, $StartServersOnly, $BuildImplementationOnly, $InstallImplementationNodePackagesOnly) -Value $false) {
+  if ($ExecuteImplementationDatabaseScriptsOnly) {
+    $instructions.ExecuteImplementationDatabaseScripts = $true
+  }  
+
+  if (All-Values-Are @( `
+      $PublishOnly, `
+      $BuildDotNetOnly, `
+      $StartServersOnly, `
+      $BuildImplementationOnly, `
+      $InstallImplementationNodePackagesOnly, `
+      $CleanESOnly, `
+      $ExecuteImplementationDatabaseScriptsOnly `
+    ) -Value $false `
+  ) {
     Set-All-Values $instructions -Value $true
   }
 
@@ -493,9 +518,21 @@ try {
       -Command 'iisexpress\.exe"  /config:".*?AdInsure\.Scheduler\\config\\applicationhost\.config" /site:"Scheduler\.Web" /apppool:"Scheduler\.Web AppPool"'     
   }
 
+  if ($instructions.StopMockIntegrationService) {
+    Find-And-Stop-Process `
+      -ProcessName "dotnet.exe" `
+      -Command 'dotnet\.exe" run --project \.\\plugins\\MockIntegrationService\\MockIntegrationService\.csproj run --urls http://\*:60009 --verbosity n'     
+  }
+
+  # Write-Error "FAILED!" -ErrorAction Stop
+
   Set-Location $Root
 
   if ($Clean) {
+
+    if ($CleanNodeModules) {
+      Remove-Node-Modules -Dir $Root
+    }
 
     Write-Output "Cleaning mono"
 
@@ -551,14 +588,6 @@ try {
 
     Start-Server-In-Background `
       -InitializationScript $sharedFunctions `
-      -CleanUpCommand "docker rm -f es" `
-      -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --platform=linux --name es -h es elasticsearch:7.16.2' `
-      -Retry `
-      -SuccessCheck "Active license is now \[BASIC\]; Security is disabled" `
-      -ErrorCheck "failure in a Windows system call: The virtual machine or container with the specified identifier is not running"    
-
-    Start-Server-In-Background `
-      -InitializationScript $sharedFunctions `
       -CleanUpCommand "docker rm -f amq" `
       -Command 'docker run -p 61616:61616 -p 8161:8161 --platform=linux -m 5g --name amq --env ACTIVEMQ_OPTS="-Xms4g -Xmx5g -DXmx=1024m -DXss=600k" rmohr/activemq:5.15.9' `
       -Retry `
@@ -570,6 +599,16 @@ try {
     #   -CleanUpCommand 'docker rm -f oracle' `
     #   -Command 'docker run -p 1521:1521 --name oracle registry.adacta-fintech.com/ops/infra/oracle-xe:18.4-1709' `
     #   -Retry
+  }
+
+  if ($Clean -or $instructions.CleanES) {
+    Start-Server-In-Background `
+      -InitializationScript $sharedFunctions `
+      -CleanUpCommand "docker rm -f es" `
+      -Command 'docker run -p 9200:9200 -m 4g -e "discovery.type=single-node" --platform=linux --name es -h es elasticsearch:7.16.2' `
+      -Retry `
+      -SuccessCheck "Active license is now \[BASIC\]; Security is disabled" `
+      -ErrorCheck "failure in a Windows system call: The virtual machine or container with the specified identifier is not running"    
   }
 
   Set-Location $monoDir
@@ -607,7 +646,19 @@ try {
       Remove-Node-Modules -Dir $implementationDir
     }
 
-    Run-Command-Stop-On-Error "yarn install"
+    do {
+      $runAgain = $false
+      Run-Command "yarn install" 2>&1 | Tee-Object -Variable yarnInstallOutput
+      
+      # Write-Output "====================================================="
+      # Write-Output $yarnInstallOutput
+      # Write-Output "====================================================="
+
+      if ($yarnInstallOutput -match "401 Unauthorized") {
+        $runAgain = $true
+      }
+    } while ($runAgain)
+    
   }
 
   if (($Layer -like "hr") -and ($instructions.ImportCSV)) {
@@ -626,6 +677,14 @@ try {
   if ($instructions.StartAdInsureServer) {
     Start-Adinsure-Server-In-Background `
       -MonoDir $monoDir `
+      -InitializationScript $sharedFunctions
+  }
+
+  if ($instructions.StartMockIntegrationService) {
+    Start-Server-In-Background `
+      -Command ".\build.ps1 -RunMockService" `
+      -SuccessCheck "Content root path:.*?plugins\\MockIntegrationService\\" `
+      -Dir $implementationDir `
       -InitializationScript $sharedFunctions
   }
 
