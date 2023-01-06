@@ -360,6 +360,7 @@ try {
     StopIdentityServer = $false
     StopScheduler = $false
     StopMockIntegrationService = $false
+    StopSimulatedDMS = $false
     BuildAdInsureServer = $false
     RestoreDatabase = $false
     BuildImplementation = $false
@@ -369,6 +370,7 @@ try {
     StartIdentityServer = $false
     StartAdInsureServer = $false
     StartMockIntegrationService = $false
+    StartSimulatedDMS = $false
     ValidateWorkspace = $false
     PublishWorkspace = $false
     ExecuteImplementationPostPublishDatabaseScripts = $false
@@ -524,6 +526,12 @@ try {
       -Command 'dotnet\.exe" run --project \.\\plugins\\MockIntegrationService\\MockIntegrationService\.csproj run --urls http://\*:60009 --verbosity n'     
   }
 
+  if ($instructions.StopSimulatedDMS) {
+    Find-And-Stop-Process `
+      -ProcessName "dotnet.exe" `
+      -Command 'dotnet\.exe" run --project \.\\plugins\\AdActaDMSSimulation\\AdActaDMSSimulatedServer\\AdActaDMSSimulatedServer\.csproj run --urls http://\*:60010 --verbosity n'     
+  }
+
   # Write-Error "FAILED!" -ErrorAction Stop
 
   Set-Location $Root
@@ -657,6 +665,9 @@ try {
       if ($yarnInstallOutput -match "401 Unauthorized") {
         $runAgain = $true
       }
+      elseif ($LASTEXITCODE -ne 0) {
+        Write-Error "FAILED!" -ErrorAction Stop
+      }
     } while ($runAgain)
     
   }
@@ -684,6 +695,14 @@ try {
     Start-Server-In-Background `
       -Command ".\build.ps1 -RunMockService" `
       -SuccessCheck "Content root path:.*?plugins\\MockIntegrationService\\" `
+      -Dir $implementationDir `
+      -InitializationScript $sharedFunctions
+  }
+
+  if ($instructions.StartSimulatedDMS) {
+    Start-Server-In-Background `
+      -Command ".\build.ps1 -RunSimulatedDMS" `
+      -SuccessCheck "Content root path:.*?plugins\\AdActaDMSSimulation\\" `
       -Dir $implementationDir `
       -InitializationScript $sharedFunctions
   }
