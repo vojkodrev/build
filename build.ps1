@@ -22,7 +22,8 @@ param(
   [switch]$DontValidatePlatformVersion = $false,
   [switch]$DontValidateImplementationMasterBranch = $false,
   [switch]$DontValidateWorkspace = $false,
-  [switch]$StartServersOnly = $false
+  [switch]$StartServersOnly = $false,
+  [switch]$StartAdInsureServerOnly = $false
 )
 
 $sharedFunctions = {
@@ -422,9 +423,20 @@ try {
     $instructions.StopAdInsureServer = $true
     $instructions.StopIdentityServer = $true
     $instructions.StopAngularClient = $true
+    $instructions.StopMockIntegrationService = $true
+    $instructions.StopSimulatedDMS = $true
     $instructions.StartIdentityServer = $true
     $instructions.StartAdInsureServer = $true
     $instructions.StartAngularClient = $true
+    $instructions.StartMockIntegrationService = $true
+    $instructions.StartSimulatedDMS = $true
+  }
+
+  if ($StartAdInsureServerOnly) {
+    $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.StopAdInsureServer = $true
+    $instructions.StartAdInsureServer = $true
   }
 
   if ($ExecuteImplementationDatabaseScriptsOnly) {
@@ -435,6 +447,7 @@ try {
       $PublishOnly, `
       $BuildDotNetOnly, `
       $StartServersOnly, `
+      $StartAdInsureServerOnly, `
       $BuildImplementationOnly, `
       $InstallImplementationNodePackagesOnly, `
       $CleanESOnly, `
