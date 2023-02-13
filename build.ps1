@@ -110,7 +110,11 @@ function Start-Server-In-Background {
 
       Receive-Job $job -OutVariable jOut -ErrorVariable jError
 
-      if (($job.JobStateInfo.State -eq "Failed") -or ($job.JobStateInfo.State -eq "Stopped") -or ($ErrorCheck -and ($jError -match $ErrorCheck)) -or ($ErrorCheck -and ($jOut -match $ErrorCheck))) {
+      if (($job.JobStateInfo.State -eq "Failed") `
+        -or ($job.JobStateInfo.State -eq "Stopped") `
+        -or ($ErrorCheck -and ($jError -match $ErrorCheck)) `
+        -or ($ErrorCheck -and ($jOut -match $ErrorCheck)) `
+      ) {
         if ($Retry) {
           $runAgain = $true
         } else {
