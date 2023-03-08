@@ -708,18 +708,20 @@ try {
       -InitializationScript $sharedFunctions
   }
 
-  if ($instructions.StartMockIntegrationService) {
+  if (($Layer -eq 'signal') -and $instructions.StartMockIntegrationService) {
     Start-Server-In-Background `
-      -Command ".\build.ps1 -RunMockService" `
+      -Command ".\build.ps1 -RunMockService 2>&1" `
       -SuccessCheck "Content root path:.*?plugins\\MockIntegrationService\\" `
+      -ErrorCheck "The plugin credential provider could not acquire credentials\. Authentication may require manual action\." `
       -Dir $implementationDir `
       -InitializationScript $sharedFunctions
   }
 
-  if ($instructions.StartSimulatedDMS) {
+  if (($Layer -eq 'signal') -and $instructions.StartSimulatedDMS) {
     Start-Server-In-Background `
-      -Command ".\build.ps1 -RunSimulatedDMS" `
+      -Command ".\build.ps1 -RunSimulatedDMS 2>&1" `
       -SuccessCheck "Content root path:.*?plugins\\AdActaDMSSimulation\\" `
+      -ErrorCheck "The plugin credential provider could not acquire credentials\. Authentication may require manual action\." `
       -Dir $implementationDir `
       -InitializationScript $sharedFunctions
   }
