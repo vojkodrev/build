@@ -727,12 +727,38 @@ try {
   }
 
   if ($instructions.ValidateWorkspace) {
-    Run-Command-Stop-On-Error "yarn run validate-workspace -e $implEnvLocalJsonFilename" #-CommandOutput ([ref]$validateWorkspaceOutput)
+    Run-Command-Stop-On-Error "yarn run validate-workspace -e $implEnvLocalJsonFilename"
   }
   
   if ($instructions.PublishWorkspace) {
 
-    Run-Command-Stop-On-Error "yarn run publish-workspace -e $implEnvLocalJsonFilename" | Tee-Object -Variable publishWorkspaceOutput # -CommandOutput ([ref]$publishWorkspaceOutput)
+    do {
+      $runAgain = $false
+      $publishWorkspaceOutput = $null
+
+      Run-Command "yarn run publish-workspace -e $implEnvLocalJsonFilename 2>&1" | Tee-Object -Variable publishWorkspaceOutput
+      
+      # Write-Output "====================================================="
+      # Write-Output $publishWorkspaceOutput
+      # Write-Output "====================================================="
+
+      if (($publishWorkspaceOutput -match "Could not create ADO\.NET connection for transaction") `
+        -or ($publishWorkspaceOutput -match "ECONNREFUSED") `
+        -or ($publishWorkspaceOutput -match "TimeoutError: Timeout awaiting 'request'") `
+        -or ($publishWorkspaceOutput -match "failed, reason: socket hang up") `
+      ) {
+        Stop-Adinsure-Server
+
+        Start-Adinsure-Server-In-Background `
+          -MonoDir $monoDir `
+          -InitializationScript $sharedFunctions
+
+        $runAgain = $true
+      }
+      elseif ($LASTEXITCODE -ne 0) {
+        Write-Error "FAILED!" -ErrorAction Stop
+      }
+    } while ($runAgain)
 
     if ($publishWorkspaceOutput -match "MessageRoute") {
       Stop-Adinsure-Server
