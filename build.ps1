@@ -667,9 +667,9 @@ try {
   }
   
   if ($instructions.InstallImplementationNodePackages) {
-    if ($InstallImplementationNodePackagesOnly) {
-      Remove-Node-Modules -Dir $implementationDir
-    }
+    # if ($InstallImplementationNodePackagesOnly) {
+    #   Remove-Node-Modules -Dir $implementationDir
+    # }
 
     do {
       $runAgain = $false
