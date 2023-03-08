@@ -3,7 +3,7 @@ param(
   [string]
   $Root = "c:\code\sava",
   
-  [ValidateSet("hr", "si", "generali-hu", "signal", "re")]
+  [ValidateSet("hr", "si", "generali-hu", "signal", "re", "triglav-si")]
   [string]
   $Layer = "hr",
   
@@ -224,6 +224,9 @@ function Validate-Impl-Env-Local-Json {
   } elseif ($Layer -eq "signal") {
     $requiredJsonTargetlayer = "signal"
     $requiredJsonCurrency = "HUF"
+  } elseif ($Layer -eq "triglav-si") {
+    $requiredJsonTargetlayer = "triglav-si"
+    $requiredJsonCurrency = "EUR"
   } else {
     Write-Error "Unsupported layer $Layer during $ImplEnvLocalJsonPath validation" -ErrorAction Stop
   }
@@ -487,7 +490,11 @@ try {
   $monoImplSettingsJsonFilename = [io.path]::combine($monoConfDir, "implSettings.json")
 
   $implEnvLocalJsonFilename = $null
-  if (($Layer -eq "generali-hu") -or ($Layer -eq "signal") -or ($Layer -eq "re")) {
+  if (($Layer -eq "generali-hu") `
+    -or ($Layer -eq "signal") `
+    -or ($Layer -eq "re") `
+    -or ($Layer -eq "triglav-si") `
+  ) {
     $implEnvLocalJsonFilename = "environment.local.json"
   } else {
     $implEnvLocalJsonFilename = "environment.local.$Layer.json"
@@ -647,7 +654,10 @@ try {
   }
   
   if ($instructions.RestoreDatabase) {
-    if (($Layer -eq "generali-hu") -or ($Layer -eq "signal")) {
+    if (($Layer -eq "generali-hu") `
+      -or ($Layer -eq "signal") `
+      -or ($Layer -eq "triglav-si") `
+    ) {
       Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType MSSQL -SkipBasic"
     } elseif ($Layer -eq "re") {
       Run-Command-Stop-On-Error ".\build.ps1 -Restore -DatabaseType MSSQL"
@@ -664,6 +674,7 @@ try {
 
   if ($instructions.ExecuteImplementationDatabaseScripts) {
     Run-Command-Stop-On-Error ".\build.ps1 -ExecuteScripts -TargetLayer $Layer"
+    # Write-Error "FAILED!" -ErrorAction Stop
   }
   
   if ($instructions.InstallImplementationNodePackages) {
@@ -769,7 +780,12 @@ try {
     }
   }
   
-  if ($instructions.ExecuteImplementationPostPublishDatabaseScripts -and ($Layer -ne "generali-hu") -and ($Layer -ne "signal") -and ($Layer -ne "re")) {
+  if ($instructions.ExecuteImplementationPostPublishDatabaseScripts `
+    -and ($Layer -ne "generali-hu") `
+    -and ($Layer -ne "signal") `
+    -and ($Layer -ne "re") `
+    -and ($Layer -ne "triglav-si") `
+  ) {
     Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts -TargetLayer $Layer"
   }
 
