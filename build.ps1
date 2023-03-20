@@ -20,6 +20,7 @@ param(
   [switch]$CleanESOnly = $false,
   [switch]$ExecuteImplementationDatabaseScriptsOnly = $false,
   [switch]$DontValidatePlatformVersion = $false,
+  [switch]$DontValidateBasicVersion = $false,
   [switch]$DontValidateImplementationMasterBranch = $false,
   [switch]$DontValidateWorkspace = $false,
   [switch]$StartServersOnly = $false,
@@ -250,20 +251,23 @@ function Validate-Platform-Version {
     [string]$ImplementationDir,
 
     [parameter(Mandatory=$true)]
-    [string]$MonoDir
+    [string]$Dir,
+
+    [parameter(Mandatory=$true)]
+    [string]$Desc
   )
 
   $startingLocation = Get-Location
 
   try {
 
-    Set-Location $MonoDir
+    Set-Location $Dir
   
     $requiredPlatformVersion = [IO.File]::ReadAllText([io.path]::combine($ImplementationDir, "PLATFORM_VERSION"))
     # $correctTag = git tag --points-at HEAD | Select-String $requiredPlatformVersion
     $correctBranch = git rev-parse --abbrev-ref HEAD | Select-String $requiredPlatformVersion
     if (!$correctBranch) {
-      Write-Error "Mono $requiredPlatformVersion is required" -ErrorAction Stop
+      Write-Error "$Desc $requiredPlatformVersion is required" -ErrorAction Stop
     }
   
   } finally {
@@ -361,6 +365,7 @@ try {
 
   $instructions = @{
     ValidatePlatformVersion = $false
+    ValidateBasicVersion = $false
     ValidateImplementationMasterBranch = $false
     CleanES = $false
     StopAdInsureServer = $false
@@ -394,6 +399,7 @@ try {
 
   if ($PublishOnly) {
     $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateBasicVersion = $true
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.ValidateWorkspace = $true
     $instructions.PublishWorkspace = $true
@@ -401,6 +407,7 @@ try {
 
   if ($BuildDotNetOnly) {
     $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateBasicVersion = $true
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopAdInsureServer = $true
     $instructions.StopIdentityServer = $true
@@ -413,6 +420,7 @@ try {
 
   if ($BuildImplementationOnly) {
     $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateBasicVersion = $true
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopAdInsureServer = $true
     $instructions.StopScheduler = $true
@@ -426,6 +434,7 @@ try {
 
   if ($StartServersOnly) {
     $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateBasicVersion = $true
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopAdInsureServer = $true
     $instructions.StopIdentityServer = $true
@@ -441,6 +450,7 @@ try {
 
   if ($StartAdInsureServerOnly) {
     $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateBasicVersion = $true
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopAdInsureServer = $true
     $instructions.StartAdInsureServer = $true
@@ -468,6 +478,10 @@ try {
     $instructions.ValidatePlatformVersion = $false
   }
 
+  if ($DontValidateBasicVersion) {
+    $instructions.ValidateBasicVersion = $false
+  }
+
   if ($DontValidateImplementationMasterBranch) {
     $instructions.ValidateImplementationMasterBranch = $false
   }
@@ -484,6 +498,7 @@ try {
   $implementationConfigurationDir = [io.path]::combine($implementationDir, "configuration")
   $printoutAssetsDir = [io.path]::combine($implementationDir, "printout-assets")
   $monoDir = [io.path]::combine($Root, "mono")
+  $basicDir = [io.path]::combine($Root, "basic")
   $monoClientDir = [io.path]::combine($monoDir, "client")
   $monoConfDir = [io.path]::combine($monoDir, "server", "AdInsure.Server", "conf")
   $adiEnvDir = [io.path]::combine($implementationDir, ".adi", "environments")
@@ -518,7 +533,15 @@ try {
 
   if ($instructions.ValidatePlatformVersion) {
     Validate-Platform-Version `
-      -MonoDir $monoDir `
+      -Dir $monoDir `
+      -Desc "Mono" `
+      -ImplementationDir $implementationDir
+  }
+
+  if ((Test-Path $basicDir) -and ($instructions.ValidateBasicVersion)) {
+    Validate-Platform-Version `
+      -Dir $basicDir `
+      -Desc "Basic" `
       -ImplementationDir $implementationDir
   }
 
