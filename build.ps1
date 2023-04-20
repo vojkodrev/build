@@ -160,7 +160,6 @@ function Find-And-Stop-Process {
     [parameter(Mandatory=$true)]
     [string]$ProcessName,
 
-    [parameter(Mandatory=$true)]
     [string]$Command
   )
 
@@ -171,7 +170,7 @@ function Find-And-Stop-Process {
 
     # Write-Output $commandLine.CommandLine
 
-    if ($commandLine.CommandLine -match $Command) {
+    if (($Command -and $commandLine.CommandLine -match $Command) -or (!$Command)) {
       Write-Output "Stopping $($commandLine.CommandLine)"
       Stop-Process $processId.ProcessId
     }
@@ -391,6 +390,8 @@ try {
     ExecuteImplementationPostPublishDatabaseScripts = $false
     InstallAngularNodePackages = $false
     StartAngularClient = $false
+    StartScheduler = $false
+    PublishSchedulerJobs = $false
   }
 
   if ($CleanESOnly) {
@@ -418,6 +419,7 @@ try {
     $instructions.BuildImplementation = $true
     $instructions.StartIdentityServer = $true
     $instructions.StartAdInsureServer = $true
+    $instructions.StartScheduler = $true
   }
 
   if ($BuildImplementationOnly) {
@@ -428,6 +430,7 @@ try {
     $instructions.StopScheduler = $true
     $instructions.BuildImplementation = $true
     $instructions.StartAdInsureServer = $true
+    $instructions.StartScheduler = $true
   }
 
   if ($InstallImplementationNodePackagesOnly) {
@@ -443,11 +446,13 @@ try {
     $instructions.StopAngularClient = $true
     $instructions.StopMockIntegrationService = $true
     $instructions.StopSimulatedDMS = $true
+    $instructions.StopScheduler = $true
     $instructions.StartIdentityServer = $true
     $instructions.StartAdInsureServer = $true
     $instructions.StartAngularClient = $true
     $instructions.StartMockIntegrationService = $true
     $instructions.StartSimulatedDMS = $true
+    $instructions.StartScheduler = $true
   }
 
   if ($StartAdInsureServerOnly) {
@@ -498,13 +503,17 @@ try {
 
   $implementationDir = [io.path]::combine($Root, "implementation")
   $implementationConfigurationDir = [io.path]::combine($implementationDir, "configuration")
+  $implementationSchedulerDir = [io.path]::combine($implementationDir, ".build", 'scheduler')
   $printoutAssetsDir = [io.path]::combine($implementationDir, "printout-assets")
   $monoDir = [io.path]::combine($Root, "mono")
   $basicDir = [io.path]::combine($Root, "basic")
+  $schedulerRootDir = [io.path]::combine($Root, "scheduler")
+  $schedulerSolutionDir = [io.path]::combine($schedulerRootDir, "src")
   $monoClientDir = [io.path]::combine($monoDir, "client")
   $monoConfDir = [io.path]::combine($monoDir, "server", "AdInsure.Server", "conf")
   $adiEnvDir = [io.path]::combine($implementationDir, ".adi", "environments")
   $monoImplSettingsJsonFilename = [io.path]::combine($monoConfDir, "implSettings.json")
+  $monoImplSettingsJsonTmpFilename = [io.path]::combine($monoDir, "..", "implSettings.json")
 
   $implEnvLocalJsonFilename = $null
   if (($Layer -eq "generali-hu") `
@@ -569,8 +578,7 @@ try {
 
   if ($instructions.StopScheduler) {
     Find-And-Stop-Process `
-      -ProcessName "iisexpress.exe" `
-      -Command 'iisexpress\.exe"  /config:".*?AdInsure\.Scheduler\\config\\applicationhost\.config" /site:"Scheduler\.Web" /apppool:"Scheduler\.Web AppPool"'     
+      -ProcessName "Scheduler.Web.exe"
   }
 
   if ($instructions.StopMockIntegrationService) {
@@ -585,11 +593,13 @@ try {
       -Command 'dotnet\.exe" run --project \.\\plugins\\AdActaDMSSimulation\\AdActaDMSSimulatedServer\\AdActaDMSSimulatedServer\.csproj run --urls http://\*:60010 --verbosity n'     
   }
 
-  # Write-Error "FAILED!" -ErrorAction Stop
-
   Set-Location $Root
 
   if ($Clean) {
+
+    # Run-Command "net stop docker"
+    # Run-Command-Stop-On-Error "wsl --shutdown"
+    # Run-Command-Stop-On-Error "net start docker"
 
     if ($CleanNodeModules) {
       Remove-Node-Modules -Dir $Root
@@ -600,7 +610,7 @@ try {
     Set-Location $monoDir
 
     try {
-      Run-Command-Stop-On-Error "Move-Item -Path server\AdInsure.Server\conf\implSettings.json -Destination .. -Force"
+      Run-Command-Stop-On-Error "Move-Item -Path $monoImplSettingsJsonFilename -Destination $monoImplSettingsJsonTmpFilename -Force"
 
       $gitStashOutput = Run-Command "git stash --include-untracked"
       Write-Output $gitStashOutput
@@ -612,7 +622,7 @@ try {
         Run-Command-Stop-On-Error "git stash pop"
       }
     } finally {
-      Run-Command-Stop-On-Error "Move-Item -Destination server\AdInsure.Server\conf -Path ..\implSettings.json -Force"
+      Run-Command-Stop-On-Error "Move-Item -Destination $monoImplSettingsJsonFilename -Path $monoImplSettingsJsonTmpFilename -Force"
     }
 
     Write-Output "Cleaning implementation"
@@ -837,6 +847,22 @@ try {
       -InitializationScript $sharedFunctions
   }
 
+  if (Test-Path $schedulerRootDir) {
+    if ($instructions.StartScheduler) {
+      Start-Server-In-Background `
+        -Command "dotnet run --project .\Scheduler.Web\" `
+        -SuccessCheck "Microsoft\.Hosting\.Lifetime Application started\. Press Ctrl\+C to shut down\." `
+        -Dir $schedulerSolutionDir `
+        -InitializationScript $sharedFunctions
+    }
+  }
+
+  if (Test-Path $implementationSchedulerDir) {
+    if ($instructions.PublishSchedulerJobs) {
+      Set-Location $implementationSchedulerDir
+      Run-Command-Stop-On-Error ".\import.ps1"
+    }
+  }
 } finally {
   Set-Location $startingLocation
 }
