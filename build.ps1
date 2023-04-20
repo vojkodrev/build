@@ -522,6 +522,10 @@ try {
     Write-Error "Wrong directory structure in $Root mono, mono\client and implementation dirs expected!" -ErrorAction Stop
   }
 
+  if (Test-Path $monoImplSettingsJsonTmpFilename) {
+    Run-Command "Move-Item -Destination $monoImplSettingsJsonFilename -Path $monoImplSettingsJsonTmpFilename -Force"  
+  }
+
   Validate-Impl-Env-Local-Json `
     -Layer $Layer `
     -ImplEnvLocalJsonPath $implEnvLocalJsonPath `
