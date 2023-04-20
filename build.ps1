@@ -12,6 +12,8 @@ param(
 
   [switch]$Clean = $false,
   [switch]$CleanNodeModules = $false,
+  
+  [switch]$ForcePublish = $false,
 
   [switch]$BuildDotNetOnly = $false,
   [switch]$BuildImplementationOnly = $false,
@@ -770,7 +772,12 @@ try {
       $runAgain = $false
       $publishWorkspaceOutput = $null
 
-      Run-Command "yarn run publish-workspace -e $implEnvLocalJsonFilename 2>&1" | Tee-Object -Variable publishWorkspaceOutput
+      if ($ForcePublish) {
+        Run-Command "yarn run publish-workspace -e $implEnvLocalJsonFilename -f 2>&1" | Tee-Object -Variable publishWorkspaceOutput
+      }
+      else {
+        Run-Command "yarn run publish-workspace -e $implEnvLocalJsonFilename 2>&1" | Tee-Object -Variable publishWorkspaceOutput
+      }
       
       # Write-Output "====================================================="
       # Write-Output $publishWorkspaceOutput
