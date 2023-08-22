@@ -17,14 +17,17 @@ param(
 
   [switch]$BuildDotNetOnly = $false,
   [switch]$BuildImplementationOnly = $false,
+  [switch]$BuildMockIntegrationServiceOnly = $false,
   [switch]$InstallImplementationNodePackagesOnly = $false,
   [switch]$PublishOnly = $false,
   [switch]$CleanESOnly = $false,
+  [switch]$CleanAMQOnly = $false,
   [switch]$ExecuteImplementationDatabaseScriptsOnly = $false,
   [switch]$DontValidatePlatformVersion = $false,
   [switch]$DontValidateBasicVersion = $false,
   [switch]$DontValidateImplementationMasterBranch = $false,
   [switch]$DontValidateWorkspace = $false,
+  [switch]$DontStartScheduler = $false,
   [switch]$StartServersOnly = $false,
   [switch]$StartAdInsureServerOnly = $false
 )
@@ -369,6 +372,7 @@ try {
     ValidateBasicVersion = $false
     ValidateImplementationMasterBranch = $false
     CleanES = $false
+    CleanAMQ = $false
     StopAdInsureServer = $false
     StopAngularClient = $false
     StopIdentityServer = $false
@@ -400,6 +404,12 @@ try {
     $instructions.StartAdInsureServer = $true
   }
 
+  if ($CleanAMQOnly) {
+    $instructions.CleanAMQ = $true
+    $instructions.StopAdInsureServer = $true
+    $instructions.StartAdInsureServer = $true
+  }
+
   if ($PublishOnly) {
     $instructions.ValidatePlatformVersion = $true
     $instructions.ValidateBasicVersion = $true
@@ -414,12 +424,24 @@ try {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopAdInsureServer = $true
     $instructions.StopIdentityServer = $true
+    $instructions.StopMockIntegrationService = $true
+    $instructions.StopSimulatedDMS = $true
     $instructions.StopScheduler = $true
     $instructions.BuildAdInsureServer = $true
     $instructions.BuildImplementation = $true
     $instructions.StartIdentityServer = $true
     $instructions.StartAdInsureServer = $true
     $instructions.StartScheduler = $true
+    $instructions.StartMockIntegrationService = $true
+    $instructions.StartSimulatedDMS = $true
+  }
+
+  if ($BuildMockIntegrationServiceOnly) {
+    $instructions.ValidatePlatformVersion = $true
+    $instructions.ValidateBasicVersion = $true
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.StopMockIntegrationService = $true
+    $instructions.StartMockIntegrationService = $true
   }
 
   if ($BuildImplementationOnly) {
@@ -428,8 +450,12 @@ try {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopAdInsureServer = $true
     $instructions.StopScheduler = $true
+    $instructions.StopMockIntegrationService = $true
+    $instructions.StopSimulatedDMS = $true
     $instructions.BuildImplementation = $true
     $instructions.StartAdInsureServer = $true
+    $instructions.StartMockIntegrationService = $true
+    $instructions.StartSimulatedDMS = $true
     $instructions.StartScheduler = $true
   }
 
@@ -473,8 +499,10 @@ try {
       $StartServersOnly, `
       $StartAdInsureServerOnly, `
       $BuildImplementationOnly, `
+      $BuildMockIntegrationServiceOnly, `
       $InstallImplementationNodePackagesOnly, `
       $CleanESOnly, `
+      $CleanAMQOnly, `
       $ExecuteImplementationDatabaseScriptsOnly `
     ) -Value $false `
   ) {
@@ -497,13 +525,18 @@ try {
     $instructions.ValidateWorkspace = $false
   }
 
+  if ($DontStartScheduler) {
+    $instructions.StartScheduler = $false
+  }
+
   if (!(Test-Path $Root)) {
     Write-Error "Directory $Root does not exist!" -ErrorAction Stop
   }
 
   $implementationDir = [io.path]::combine($Root, "implementation")
   $implementationConfigurationDir = [io.path]::combine($implementationDir, "configuration")
-  $implementationSchedulerDir = [io.path]::combine($implementationDir, ".build", 'scheduler')
+  $implementationSchedulerDir1 = [io.path]::combine($implementationDir, ".build", 'scheduler')
+  $implementationSchedulerDir2 = [io.path]::combine($implementationDir, 'scheduler')
   $printoutAssetsDir = [io.path]::combine($implementationDir, "printout-assets")
   $monoDir = [io.path]::combine($Root, "mono")
   $basicDir = [io.path]::combine($Root, "basic")
@@ -657,13 +690,6 @@ try {
       -Command "docker run -p 9423:9423 --name signal_pdf -v `"${printoutAssetsDir}:/assets/printout-assets`" --env JAVA_OPTIONS=`"-Xmx2g -Dcom.realobjects.pdfreactor.webservice.securitySettings.defaults.allowFileSystemAccess=true`" --platform=linux realobjects/pdfreactor:10" `
       -SuccessCheck "INFO: Started @\d+ms"
 
-    Start-Server-In-Background `
-      -InitializationScript $sharedFunctions `
-      -CleanUpCommand "docker rm -f amq" `
-      -Command 'docker run -p 61616:61616 -p 8161:8161 --platform=linux -m 5g --name amq --env ACTIVEMQ_OPTS="-Xms4g -Xmx5g -DXmx=1024m -DXss=600k" rmohr/activemq:5.15.9' `
-      -Retry `
-      -SuccessCheck "INFO \| jolokia-agent: Using policy access restrictor classpath:\/jolokia-access.xml" `
-      -ErrorCheck "encountered an error during hcsshim::System::waitBackground: failure in a Windows system call: The virtual machine or container with the specified identifier is not running"
 
     # Start-Server-In-Background `
     #   -InitializationScript $sharedFunctions `
@@ -681,6 +707,16 @@ try {
       -SuccessCheck "Active license is now \[BASIC\]; Security is disabled" `
       -ErrorCheck "failure in a Windows system call: The virtual machine or container with the specified identifier is not running"    
   }
+
+  if ($Clean -or $instructions.CleanAMQ) {
+    Start-Server-In-Background `
+      -InitializationScript $sharedFunctions `
+      -CleanUpCommand "docker rm -f amq" `
+      -Command 'docker run -p 61616:61616 -p 8161:8161 --platform=linux -m 5g --name amq --env ACTIVEMQ_OPTS="-Xms4g -Xmx5g -DXmx=1024m -DXss=600k" rmohr/activemq:5.15.9' `
+      -Retry `
+      -SuccessCheck "INFO \| jolokia-agent: Using policy access restrictor classpath:\/jolokia-access.xml" `
+      -ErrorCheck "encountered an error during hcsshim::System::waitBackground: failure in a Windows system call: The virtual machine or container with the specified identifier is not running"  
+  }  
 
   Set-Location $monoDir
 
@@ -729,7 +765,10 @@ try {
       # Write-Output $yarnInstallOutput
       # Write-Output "====================================================="
 
-      if ($yarnInstallOutput -match "401 Unauthorized") {
+      if ( `
+        ($yarnInstallOutput -match "401 Unauthorized") `
+        -or ($yarnInstallOutput -match "error Couldn't find package") `
+      ) {
         $runAgain = $true
       }
       elseif ($LASTEXITCODE -ne 0) {
@@ -801,6 +840,7 @@ try {
         -or ($publishWorkspaceOutput -match "ECONNREFUSED") `
         -or ($publishWorkspaceOutput -match "TimeoutError: Timeout awaiting 'request'") `
         -or ($publishWorkspaceOutput -match "failed, reason: socket hang up") `
+        -or ($publishWorkspaceOutput -match "Invalid configuration: cacheMemoryLimitMegabytes") `
       ) {
         Stop-Adinsure-Server
 
@@ -854,13 +894,20 @@ try {
         -SuccessCheck "Microsoft\.Hosting\.Lifetime Application started\. Press Ctrl\+C to shut down\." `
         -Dir $schedulerSolutionDir `
         -InitializationScript $sharedFunctions
-    }
-  }
 
-  if (Test-Path $implementationSchedulerDir) {
-    if ($instructions.PublishSchedulerJobs) {
-      Set-Location $implementationSchedulerDir
-      Run-Command-Stop-On-Error ".\import.ps1"
+      if (Test-Path $implementationSchedulerDir1) {
+        if ($instructions.PublishSchedulerJobs) {
+          Set-Location $implementationSchedulerDir1
+          Run-Command-Stop-On-Error ".\import.ps1"
+        }
+      }
+    
+      if (Test-Path $implementationSchedulerDir2) {
+        if ($instructions.PublishSchedulerJobs) {
+          Set-Location $implementationSchedulerDir2
+          Run-Command-Stop-On-Error ".\import.ps1"
+        }
+      }
     }
   }
 } finally {
