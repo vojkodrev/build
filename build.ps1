@@ -14,6 +14,8 @@ param(
   [switch]$CleanNodeModules = $false,
   
   [switch]$ForcePublish = $false,
+  [switch]$RestartAdInsureServerAfterPublish = $false,
+  [switch]$GitRebase = $false,
 
   [switch]$BuildDotNetOnly = $false,
   [switch]$BuildImplementationOnly = $false,
@@ -29,7 +31,11 @@ param(
   [switch]$DontValidateWorkspace = $false,
   [switch]$DontStartScheduler = $false,
   [switch]$StartServersOnly = $false,
-  [switch]$StartAdInsureServerOnly = $false
+  [switch]$StartAdInsureServerOnly = $false,
+  [switch]$StartSchedulerOnly = $false,
+  [switch]$PublishSchedulerJobsOnly = $false,
+  [switch]$StopSchedulerOnly = $false,
+  [switch]$ClearAdInsureServerLogsOnly = $false
 )
 
 $sharedFunctions = {
@@ -65,8 +71,8 @@ function Run-Command-Stop-On-Error {
 
   Run-Command -Description $Description -Command $Command
 
-  if ($LASTEXITCODE -ne 0) {
-    Write-Error "FAILED!" -ErrorAction Stop
+  if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
+    Write-Error "FAILED ($LASTEXITCODE)!" -ErrorAction Stop
   }
 }
 
@@ -92,7 +98,7 @@ function Start-Server-In-Background {
 
   do {
     if ($CleanUpCommand) {
-      Run-Command $CleanUpCommand
+      Run-Command-Stop-On-Error $CleanUpCommand
     }
 
     $runAgain = $false
@@ -294,6 +300,10 @@ function Validate-Implementation-Master-Branch {
     Set-Location $ImplementationDir
   
     Run-Command-Stop-On-Error "git fetch"
+
+    if ($GitRebase) {
+      Run-Command-Stop-On-Error "git rebase --autostash origin/master"
+    }
   
     if (git branch --show-current) {
       git merge-base --is-ancestor $MasterBranchName $(git branch --show-current)
@@ -386,6 +396,7 @@ try {
     InstallImplementationNodePackages = $false
     ImportCSV = $false
     StartIdentityServer = $false
+    ClearAdInsureServerLogs = $false
     StartAdInsureServer = $false
     StartMockIntegrationService = $false
     StartSimulatedDMS = $false
@@ -489,9 +500,28 @@ try {
     $instructions.StartAdInsureServer = $true
   }
 
+  if ($StartSchedulerOnly) {
+    $instructions.StartScheduler = $true
+  }
+
+  if ($StopSchedulerOnly) {
+    $instructions.StopScheduler = $true
+  }
+
+  if ($PublishSchedulerJobsOnly) {
+    $instructions.StartScheduler = $true
+    $instructions.PublishSchedulerJobs = $true
+  }
+
   if ($ExecuteImplementationDatabaseScriptsOnly) {
     $instructions.ExecuteImplementationDatabaseScripts = $true
-  }  
+  }
+  
+  if ($ClearAdInsureServerLogsOnly) {
+    $instructions.StopAdInsureServer = $true
+    $instructions.ClearAdInsureServerLogs = $true
+    $instructions.StartAdInsureServer = $true
+  }
 
   if (All-Values-Are @( `
       $PublishOnly, `
@@ -503,7 +533,11 @@ try {
       $InstallImplementationNodePackagesOnly, `
       $CleanESOnly, `
       $CleanAMQOnly, `
-      $ExecuteImplementationDatabaseScriptsOnly `
+      $ExecuteImplementationDatabaseScriptsOnly, `
+      $StartSchedulerOnly, `
+      $StopSchedulerOnly, `
+      $PublishSchedulerJobsOnly, `
+      $ClearAdInsureServerLogsOnly `
     ) -Value $false `
   ) {
     Set-All-Values $instructions -Value $true
@@ -540,6 +574,7 @@ try {
   $printoutAssetsDir = [io.path]::combine($implementationDir, "printout-assets")
   $monoDir = [io.path]::combine($Root, "mono")
   $basicDir = [io.path]::combine($Root, "basic")
+  $adinsureServerLogsDir = [io.path]::combine($Root, "logs")
   $schedulerRootDir = [io.path]::combine($Root, "scheduler")
   $schedulerSolutionDir = [io.path]::combine($schedulerRootDir, "src")
   $monoClientDir = [io.path]::combine($monoDir, "client")
@@ -643,7 +678,7 @@ try {
     Set-Location $monoDir
 
     try {
-      Run-Command-Stop-On-Error "Move-Item -Path $monoImplSettingsJsonFilename -Destination $monoImplSettingsJsonTmpFilename -Force"
+      Run-Command-Stop-On-Error "cp $monoImplSettingsJsonFilename $env:Temp"
 
       $gitStashOutput = Run-Command "git stash --include-untracked"
       Write-Output $gitStashOutput
@@ -654,8 +689,9 @@ try {
       if (!($gitStashOutput -match "No local changes to save")) {
         Run-Command-Stop-On-Error "git stash pop"
       }
-    } finally {
-      Run-Command-Stop-On-Error "Move-Item -Destination $monoImplSettingsJsonFilename -Path $monoImplSettingsJsonTmpFilename -Force"
+    }
+    finally {
+      Run-Command-Stop-On-Error "cp $env:Temp\implSettings.json $monoImplSettingsJsonFilename"
     }
 
     Write-Output "Cleaning implementation"
@@ -791,6 +827,21 @@ try {
       -ErrorCheck "Unable to start Kestrel\."
   }
 
+  if ($instructions.ClearAdInsureServerLogs) {
+    Write-Output "Clearing adinsure logs"
+    do {
+      $runAgain = $false
+      
+      try {
+        Remove-Item "$([io.path]::combine($adinsureServerLogsDir, "adInsure.log"))"
+      }
+      catch {
+        $runAgain = $true
+        Start-Sleep 1
+      }
+    } while ($runAgain)
+  }
+
   if ($instructions.StartAdInsureServer) {
     Start-Adinsure-Server-In-Background `
       -MonoDir $monoDir `
@@ -817,8 +868,9 @@ try {
 
   if ($instructions.ValidateWorkspace) {
     Run-Command-Stop-On-Error "yarn run validate-workspace -e $implEnvLocalJsonFilename"
+    # Run-Command-Stop-On-Error "yarn run translate-workspace -e $implEnvLocalJsonFilename"
   }
-  
+
   if ($instructions.PublishWorkspace) {
 
     do {
@@ -836,6 +888,10 @@ try {
       # Write-Output $publishWorkspaceOutput
       # Write-Output "====================================================="
 
+      # if ($publishWorkspaceOutput -match "There is already an object named") {
+      #   $runAgain = $true
+      # }
+      # else
       if (($publishWorkspaceOutput -match "Could not create ADO\.NET connection for transaction") `
         -or ($publishWorkspaceOutput -match "ECONNREFUSED") `
         -or ($publishWorkspaceOutput -match "TimeoutError: Timeout awaiting 'request'") `
@@ -855,7 +911,9 @@ try {
       }
     } while ($runAgain)
 
-    if ($publishWorkspaceOutput -match "MessageRoute") {
+    if (($publishWorkspaceOutput -match "MessageRoute") `
+      -or $RestartAdInsureServerAfterPublish `
+    ) {
       Stop-Adinsure-Server
 
       Start-Adinsure-Server-In-Background `
@@ -866,7 +924,6 @@ try {
   
   if ($instructions.ExecuteImplementationPostPublishDatabaseScripts `
     -and ($Layer -ne "generali-hu") `
-    -and ($Layer -ne "signal") `
     -and ($Layer -ne "re") `
     -and ($Layer -ne "triglav-si") `
   ) {
