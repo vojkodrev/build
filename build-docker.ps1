@@ -2,6 +2,10 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Root,
     
+    [string]$PreviousRoot,
+
+    [switch]$SwitchEnv = $false,
+    
     [switch]$CleanPublish = $false,
 
     [switch]$Publish = $false,
@@ -81,22 +85,47 @@ function Validate-Implementation-Master-Branch {
 
 $instructions = @{
     ValidateImplementationMasterBranch = $false
+    StopPreviousDocker                 = $false
     GitRebase                          = $false
     Clean                              = $false
     RemoveDocker                       = $false
     InitDocker                         = $false
+    StartDocker                        = $false
     InstallNodeModules                 = $false
+    ExecutePrePublishScripts           = $false
     ValidateWorkspace                  = $false
     PublishWorkspace                   = $false
+    ExecutePostPublishScripts          = $false
     RestartServer                      = $false
+}
+
+if ($GitRebase) {
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.GitRebase = $true
 }
 
 if ($CleanPublish) {
     $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.StopPreviousDocker = $true
     $instructions.Clean = $true
     $instructions.RemoveDocker = $true
     $instructions.InitDocker = $true
     $instructions.InstallNodeModules = $true
+    $instructions.ExecutePrePublishScripts = $true
+    $instructions.ValidateWorkspace = $true
+    $instructions.PublishWorkspace = $true
+    $instructions.ExecutePostPublishScripts = $true
+    $instructions.RestartServer = $true
+}
+
+if ($SwitchEnv) {
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.StopPreviousDocker = $true
+    $instructions.StartDocker = $true
+}
+
+if ($ValidatePublish) {
+    $instructions.ValidateImplementationMasterBranch = $true
     $instructions.ValidateWorkspace = $true
     $instructions.PublishWorkspace = $true
     $instructions.RestartServer = $true
@@ -108,35 +137,33 @@ if ($Publish) {
     $instructions.RestartServer = $true
 }
 
-if ($ValidatePublish) {
-    $instructions.ValidateImplementationMasterBranch = $true
-    $instructions.ValidateWorkspace = $true
-    $instructions.PublishWorkspace = $true
-    $instructions.RestartServer = $true
-}
-
 if ($DontValidateImplementationMasterBranch) {
     $instructions.ValidateImplementationMasterBranch = $false
 }
 
-if ($GitRebase) {
-    $instructions.GitRebase = $true
+if ($instructions.ValidateImplementationMasterBranch) {
+    Validate-Implementation-Master-Branch `
+        -ImplementationDir $Root `
+        -MasterBranchName "origin/master" `
+        -GitRebase:$instructions.GitRebase
+}
+
+if ($PreviousRoot) {
+    $startingLocation = Get-Location
+    try {
+        Set-Location $PreviousRoot
+        if ($instructions.StopPreviousDocker) {
+            Run-Command-Stop-On-Error "docker-compose stop"
+        }
+    }
+    finally {
+        Set-Location $startingLocation
+    }
 }
 
 $startingLocation = Get-Location
 try {
     Set-Location $Root
-
-    if ($instructions.ValidateImplementationMasterBranch) {
-        Validate-Implementation-Master-Branch `
-            -ImplementationDir $Root `
-            -MasterBranchName "origin/master" `
-            -GitRebase:$instructions.GitRebase
-    }
-
-    if ($instructions.RemoveDocker) {
-        Run-Command-Stop-On-Error "docker-compose down -v"
-    }
 
     if ($instructions.Clean) {
         Run-Command-Stop-On-Error "git stash --include-untracked" | Tee-Object -Variable gitStashOutput
@@ -149,30 +176,82 @@ try {
         }
         
         $printoutAssetsDir = [io.path]::combine($Root, "printout-assets")
-        
         if (!(Test-Path -Path $printoutAssetsDir)) {
             Run-Command-Stop-On-Error "New-Item -Path $printoutAssetsDir -ItemType Directory"
         }
+    }
+
+    if ($instructions.RemoveDocker) {
+        Run-Command-Stop-On-Error "docker-compose down -v"
     }
     
     if ($instructions.InitDocker) {
         Run-Command-Stop-On-Error "docker-compose up -d"
     }
 
+    if ($instructions.StartDocker) {
+        Run-Command-Stop-On-Error "docker-compose start"
+    }
+
     if ($instructions.InstallNodeModules) {
-        Run-Command-Stop-On-Error "yarn install-modules"
+        do {
+            $runAgain = $false
+            $command = ""
+
+            if ($Root -match "signal") {
+                $command = "yarn install"
+            }
+            elseif ($Root -match "dva") {
+                $command = "yarn install-modules"
+            }
+
+            Run-Command $command 2>&1 | Tee-Object -Variable commandOutput
+            
+            if (($commandOutput -match "401 Unauthorized") -or ($commandOutput -match "error couldn't find package")) {
+                $runAgain = $true
+            }
+            elseif ($LASTEXITCODE -ne 0) {
+                Write-Error "FAILED!" -ErrorAction Stop
+            }
+        } while ($runAgain)
+    }
+
+    if ($instructions.ExecutePrePublishScripts) {
+        if ($Root -match "signal") {
+            Run-Command-Stop-On-Error ".\build.ps1 -ExecutePrePublishScripts"
+        }
+    }
+
+    if ($Root -match "signal") {
+        $publishEnv = "local"
+    }
+    elseif ($Root -match "dva") {
+        $publishEnv = "docker"
     }
 
     if ($instructions.ValidateWorkspace) {
-        Run-Command-Stop-On-Error "yarn run validate-workspace -e docker"
+        Run-Command-Stop-On-Error "yarn run validate-workspace -e $publishEnv"
     }
     
     if ($instructions.PublishWorkspace) {
-        Run-Command-Stop-On-Error "yarn run publish-workspace -e docker"
+        Run-Command-Stop-On-Error "yarn run publish-workspace -e $publishEnv"
+    }
+
+    if ($instructions.ExecutePostPublishScripts) {
+        if ($Root -match "signal") {
+            Run-Command-Stop-On-Error ".\build.ps1 -ExecutePostPublishScripts"
+        }
     }
     
     if ($instructions.RestartServer) {
-        Run-Command-Stop-On-Error "docker restart dva-server-1"
+        if ($Root -match "signal") {
+            $serverName = "signal-server-1"
+        }
+        elseif ($Root -match "dva") {
+            $serverName = "dva-server-1"
+        }
+
+        Run-Command-Stop-On-Error "docker restart $serverName"
     }
 }
 finally {
