@@ -12,6 +12,7 @@ param(
     [switch]$ValidatePublish = $false,
 
     [switch]$DontValidateImplementationMasterBranch = $false,
+    [switch]$DontValidateServerVersion = $false,
     
     [switch]$GitRebase = $false
 )
@@ -83,6 +84,42 @@ function Validate-Implementation-Master-Branch {
     }
 }
 
+function Validate-Server-Version {
+    param(
+        [parameter(Mandatory = $true)]
+        [string]$ImplementationDir
+    )
+  
+    $startingLocation = Get-Location
+  
+    try {
+        Set-Location $ImplementationDir
+    
+        if ($ImplementationDir -match "signal") {
+            $serverName = "signal-server-1"
+        }
+        elseif ($ImplementationDir -match "dva") {
+            $serverName = "dva-server-1"
+        }
+
+        Run-Command-Stop-On-Error "docker cp ${serverName}:/app/Adacta.AdInsure.Core.API.dll `"$([System.IO.Path]::GetTempPath())`"" | Out-Null
+        
+        $serverVersion = (Get-Item "$([System.IO.Path]::GetTempPath())/Adacta.AdInsure.Core.API.dll").VersionInfo.FileVersion
+        if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
+            Write-Error "FAILED ($LASTEXITCODE)! Unable to get server version from dll" -ErrorAction Stop
+        }
+        
+        $implPlatformVersion = "$(cat PLATFORM_VERSION).0"
+
+        if ($implPlatformVersion -ne $serverVersion) {
+            Write-Error "Server version missmatch server: $serverVersion, platform: $implPlatformVersion" -ErrorAction Stop
+        }
+    }
+    finally {
+        Set-Location $startingLocation
+    }
+}
+
 $instructions = @{
     ValidateImplementationMasterBranch = $false
     StopPreviousDocker                 = $false
@@ -90,6 +127,7 @@ $instructions = @{
     Clean                              = $false
     RemoveDocker                       = $false
     InitDocker                         = $false
+    ValidateServerVersion              = $false
     StartDocker                        = $false
     InstallNodeModules                 = $false
     ExecutePrePublishScripts           = $false
@@ -102,6 +140,7 @@ $instructions = @{
 if ($GitRebase) {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.GitRebase = $true
+    $instructions.ValidateServerVersion = $true
 }
 
 if ($CleanPublish) {
@@ -110,6 +149,7 @@ if ($CleanPublish) {
     $instructions.Clean = $true
     $instructions.RemoveDocker = $true
     $instructions.InitDocker = $true
+    $instructions.ValidateServerVersion = $true
     $instructions.InstallNodeModules = $true
     $instructions.ExecutePrePublishScripts = $true
     $instructions.ValidateWorkspace = $true
@@ -121,11 +161,13 @@ if ($CleanPublish) {
 if ($SwitchEnv) {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopPreviousDocker = $true
+    $instructions.ValidateServerVersion = $true
     $instructions.StartDocker = $true
 }
 
 if ($ValidatePublish) {
     $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.ValidateServerVersion = $true
     $instructions.ValidateWorkspace = $true
     $instructions.PublishWorkspace = $true
     $instructions.RestartServer = $true
@@ -133,12 +175,17 @@ if ($ValidatePublish) {
 
 if ($Publish) {
     $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.ValidateServerVersion = $true
     $instructions.PublishWorkspace = $true
     $instructions.RestartServer = $true
 }
 
 if ($DontValidateImplementationMasterBranch) {
     $instructions.ValidateImplementationMasterBranch = $false
+}
+
+if ($DontValidateServerVersion) {
+    $instructions.ValidateServerVersion = $false
 }
 
 if ($instructions.ValidateImplementationMasterBranch) {
@@ -184,9 +231,15 @@ try {
     if ($instructions.RemoveDocker) {
         Run-Command-Stop-On-Error "docker-compose down -v"
     }
-    
+
     if ($instructions.InitDocker) {
+        Run-Command-Stop-On-Error "docker-compose pull"
         Run-Command-Stop-On-Error "docker-compose up -d"
+    }
+
+    if ($instructions.ValidateServerVersion) {
+        Validate-Server-Version `
+            -ImplementationDir $Root
     }
 
     if ($instructions.StartDocker) {
@@ -210,7 +263,7 @@ try {
             if (($commandOutput -match "401 Unauthorized") -or ($commandOutput -match "error couldn't find package")) {
                 $runAgain = $true
             }
-            elseif ($LASTEXITCODE -ne 0) {
+            elseif (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
                 Write-Error "FAILED!" -ErrorAction Stop
             }
         } while ($runAgain)
