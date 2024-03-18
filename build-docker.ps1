@@ -135,6 +135,7 @@ $instructions = @{
     PublishWorkspace                   = $false
     ExecutePostPublishScripts          = $false
     RestartServer                      = $false
+    InstallStudio                      = $false
 }
 
 if ($GitRebase) {
@@ -156,6 +157,7 @@ if ($CleanPublish) {
     $instructions.PublishWorkspace = $true
     $instructions.ExecutePostPublishScripts = $true
     $instructions.RestartServer = $true
+    $instructions.InstallStudio = $true
 }
 
 if ($SwitchEnv) {
@@ -305,6 +307,10 @@ try {
         }
 
         Run-Command-Stop-On-Error "docker restart $serverName"
+    }
+
+    if ($instructions.InstallStudio) {
+        Run-Command-Stop-On-Error "ops download:studio -v $(cat PLATFORM_VERSION) -i"
     }
 }
 finally {
