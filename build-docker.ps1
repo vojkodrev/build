@@ -102,8 +102,11 @@ function Validate-Server-Version {
             $serverName = "dva-server-1"
         }
 
-        Run-Command-Stop-On-Error "docker cp ${serverName}:/app/Adacta.AdInsure.Core.API.dll `"$([System.IO.Path]::GetTempPath())`"" | Out-Null
-        
+        docker cp ${serverName}:/app/Adacta.AdInsure.Core.API.dll "$([System.IO.Path]::GetTempPath())" | Out-Null
+        if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
+            Write-Error "FAILED ($LASTEXITCODE)! Unable to copy Adinusre dll from docker container to temp" -ErrorAction Stop
+        }
+
         $serverVersion = (Get-Item "$([System.IO.Path]::GetTempPath())/Adacta.AdInsure.Core.API.dll").VersionInfo.FileVersion
         if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
             Write-Error "FAILED ($LASTEXITCODE)! Unable to get server version from dll" -ErrorAction Stop
