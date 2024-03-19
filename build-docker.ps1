@@ -66,7 +66,15 @@ function Validate-Implementation-Master-Branch {
     try {
         Set-Location $ImplementationDir
     
-        git fetch
+        if ($GitRebase) {
+            Run-Command-Stop-On-Error "git fetch"
+        }
+        else {
+            git fetch
+            if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
+                Write-Error "Git fetch failed ($LASTEXITCODE)" -ErrorAction Stop
+            }
+        }
   
         if ($GitRebase) {
             Run-Command-Stop-On-Error "git rebase --autostash $MasterBranchName"
@@ -74,7 +82,7 @@ function Validate-Implementation-Master-Branch {
     
         if (git branch --show-current) {
             git merge-base --is-ancestor $MasterBranchName $(git branch --show-current)
-            if ($LASTEXITCODE -gt 0) {
+            if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
                 Write-Error "There are new changes in $MasterBranchName. It should be merged into current branch." -ErrorAction Stop
             }
         }
@@ -168,6 +176,7 @@ if ($SwitchEnv) {
     $instructions.StopPreviousDocker = $true
     $instructions.ValidateServerVersion = $true
     $instructions.StartDocker = $true
+    $instructions.InstallStudio = $true
 }
 
 if ($ValidatePublish) {
