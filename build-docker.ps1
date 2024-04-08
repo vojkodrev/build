@@ -14,7 +14,9 @@ param(
     [switch]$DontValidateImplementationMasterBranch = $false,
     [switch]$DontValidateServerVersion = $false,
     
-    [switch]$GitRebase = $false
+    [switch]$GitRebase = $false,
+
+    [switch]$InstallNodeModules = $false
 )
 
 function Run-Command {
@@ -70,7 +72,7 @@ function Validate-Implementation-Master-Branch {
             Run-Command-Stop-On-Error "git fetch"
         }
         else {
-            git fetch
+            git fetch | Out-Null
             if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
                 Write-Error "Git fetch failed ($LASTEXITCODE)" -ErrorAction Stop
             }
@@ -147,6 +149,7 @@ $instructions = @{
     ExecutePostPublishScripts          = $false
     RestartServer                      = $false
     InstallStudio                      = $false
+    RegisterScheduler                  = $false
 }
 
 if ($GitRebase) {
@@ -169,6 +172,7 @@ if ($CleanPublish) {
     $instructions.ExecutePostPublishScripts = $true
     $instructions.RestartServer = $true
     $instructions.InstallStudio = $true
+    $instructions.RegisterScheduler = $true
 }
 
 if ($SwitchEnv) {
@@ -192,6 +196,12 @@ if ($Publish) {
     $instructions.ValidateServerVersion = $true
     $instructions.PublishWorkspace = $true
     $instructions.RestartServer = $true
+}
+
+if ($InstallNodeModules) {
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.ValidateServerVersion = $true
+    $instructions.InstallNodeModules = $true
 }
 
 if ($DontValidateImplementationMasterBranch) {
@@ -289,6 +299,7 @@ try {
         }
     }
 
+    $publishEnv = $null
     if ($Root -match "signal") {
         $publishEnv = "local"
     }
@@ -311,6 +322,7 @@ try {
     }
     
     if ($instructions.RestartServer) {
+        $serverName = $null
         if ($Root -match "signal") {
             $serverName = "signal-server-1"
         }
@@ -323,6 +335,22 @@ try {
 
     if ($instructions.InstallStudio) {
         Run-Command-Stop-On-Error "ops download:studio -v $(cat PLATFORM_VERSION) -i"
+    }
+
+    if ($instructions.RegisterScheduler) {
+        if ($Root -match "signal") {
+            $schedulerStartingLocation = Get-Location
+            try {
+                Set-Location .\.build\scheduler\
+                Run-Command-Stop-On-Error ".\import.ps1"
+            }
+            finally {
+                Set-Location $schedulerStartingLocation
+            }
+        }
+        elseif ($Root -match "dva") {
+            Run-Command-Stop-On-Error "yarn run register-scheduler-jobs"
+        }
     }
 }
 finally {
