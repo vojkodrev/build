@@ -284,7 +284,7 @@ try {
 
             Run-Command $command 2>&1 | Tee-Object -Variable commandOutput
             
-            if (($commandOutput -match "401 Unauthorized") -or ($commandOutput -match "error couldn't find package")) {
+            if (($commandOutput -match "401 Unauthorized") -or ($commandOutput -match "error couldn't find package") -or ($commandOutput -match "503 Service Unavailable")) {
                 $runAgain = $true
             }
             elseif (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
