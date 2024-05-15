@@ -142,6 +142,7 @@ $instructions = @{
     InitDocker                         = $false
     ValidateServerVersion              = $false
     StartDocker                        = $false
+    InstallESAnalysisIcuPlugin         = $false
     InstallNodeModules                 = $false
     ExecutePrePublishScripts           = $false
     ValidateWorkspace                  = $false
@@ -165,6 +166,7 @@ if ($CleanPublish) {
     $instructions.RemoveDocker = $true
     $instructions.InitDocker = $true
     $instructions.ValidateServerVersion = $true
+    $instructions.InstallESAnalysisIcuPlugin = $true
     $instructions.InstallNodeModules = $true
     $instructions.ExecutePrePublishScripts = $true
     $instructions.ValidateWorkspace = $true
@@ -172,7 +174,7 @@ if ($CleanPublish) {
     $instructions.ExecutePostPublishScripts = $true
     $instructions.RestartServer = $true
     $instructions.InstallStudio = $true
-    $instructions.RegisterScheduler = $true
+    # $instructions.RegisterScheduler = $true
 }
 
 if ($SwitchEnv) {
@@ -270,6 +272,11 @@ try {
         Run-Command-Stop-On-Error "docker-compose start"
     }
 
+    if (($instructions.InstallESAnalysisIcuPlugin) -and ($Root -match "signal")) {
+        Run-Command-Stop-On-Error "docker exec -it signal-es-1 bin/elasticsearch-plugin install analysis-icu"
+        Run-Command-Stop-On-Error "docker restart signal-es-1"
+    }
+    
     if ($instructions.InstallNodeModules) {
         do {
             $runAgain = $false
