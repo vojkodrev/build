@@ -94,6 +94,20 @@ function Validate-Implementation-Master-Branch {
     }
 }
 
+function Get-AdInsure-Server-Version {
+    param(
+    )
+    
+    $serverVersion = (Get-Item "$([System.IO.Path]::GetTempPath())/Adacta.AdInsure.Core.API.dll").VersionInfo.FileVersion
+    if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
+        Write-Error "FAILED ($LASTEXITCODE)! Unable to get server version from dll" -ErrorAction Stop
+    }
+
+    $fixed = $serverVersion -replace '\.0$', ''
+
+    return $fixed
+}
+
 function Validate-Server-Version {
     param(
         [parameter(Mandatory = $true)]
@@ -105,6 +119,10 @@ function Validate-Server-Version {
     try {
         Set-Location $ImplementationDir
     
+        if (!(Test-Path "PLATFORM_VERSION")) {
+            return
+        }
+
         if ($ImplementationDir -match "signal") {
             $serverName = "signal-server-1"
         }
@@ -117,12 +135,9 @@ function Validate-Server-Version {
             Write-Error "FAILED ($LASTEXITCODE)! Unable to copy Adinusre dll from docker container to temp" -ErrorAction Stop
         }
 
-        $serverVersion = (Get-Item "$([System.IO.Path]::GetTempPath())/Adacta.AdInsure.Core.API.dll").VersionInfo.FileVersion
-        if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
-            Write-Error "FAILED ($LASTEXITCODE)! Unable to get server version from dll" -ErrorAction Stop
-        }
+        $serverVersion = Get-AdInsure-Server-Version
         
-        $implPlatformVersion = "$(cat PLATFORM_VERSION).0"
+        $implPlatformVersion = cat PLATFORM_VERSION
 
         if ($implPlatformVersion -ne $serverVersion) {
             Write-Error "Server version missmatch server: $serverVersion, platform: $implPlatformVersion" -ErrorAction Stop
@@ -133,16 +148,28 @@ function Validate-Server-Version {
     }
 }
 
+function Get-Node-Info {
+    param(
+    )
+  
+    return Get-ChildItem `
+        HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall, `
+        HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall `
+    | Get-ItemProperty | Where-Object { $_.DisplayName -match 'node' }
+}
+
 $instructions = @{
     ValidateImplementationMasterBranch = $false
     StopPreviousDocker                 = $false
     GitRebase                          = $false
     Clean                              = $false
+    UninstallNode                      = $false
     RemoveDocker                       = $false
     InitDocker                         = $false
     ValidateServerVersion              = $false
     StartDocker                        = $false
     InstallESAnalysisIcuPlugin         = $false
+    InstallNode                        = $false
     InstallNodeModules                 = $false
     ExecutePrePublishScripts           = $false
     ValidateWorkspace                  = $false
@@ -163,10 +190,12 @@ if ($CleanPublish) {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopPreviousDocker = $true
     $instructions.Clean = $true
+    $instructions.UninstallNode = $true
     $instructions.RemoveDocker = $true
     $instructions.InitDocker = $true
     $instructions.ValidateServerVersion = $true
     $instructions.InstallESAnalysisIcuPlugin = $true
+    $instructions.InstallNode = $true
     $instructions.InstallNodeModules = $true
     $instructions.ExecutePrePublishScripts = $true
     $instructions.ValidateWorkspace = $true
@@ -180,6 +209,8 @@ if ($CleanPublish) {
 if ($SwitchEnv) {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopPreviousDocker = $true
+    $instructions.UninstallNode = $true
+    $instructions.InstallNode = $true
     $instructions.ValidateServerVersion = $true
     $instructions.StartDocker = $true
     $instructions.InstallStudio = $true
@@ -249,23 +280,50 @@ try {
         }
         
         $printoutAssetsDir = [io.path]::combine($Root, "printout-assets")
-        if (!(Test-Path -Path $printoutAssetsDir)) {
+        if (!(Test-Path $printoutAssetsDir)) {
             Run-Command-Stop-On-Error "New-Item -Path $printoutAssetsDir -ItemType Directory"
         }
     }
 
+    if ($instructions.UninstallNode) {
+        $node = Get-Node-Info
+        $uninstall = $true
+
+        if (($Root -match "vh") -and ($node.DisplayVersion -eq "12.22.12")) {
+            $uninstall = $false
+        }
+        elseif ($node.DisplayVersion -eq "18.20.2") {
+            $uninstall = $false
+        }
+
+        if ($node -and $uninstall) {
+            Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v18.20.2-x64.log`" | Out-Default"            
+            Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v12.22.12-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v12.22.12-x64.log`" | Out-Default"
+        }
+    }
+
     if ($instructions.RemoveDocker) {
-        Run-Command-Stop-On-Error "docker-compose down -v"
+        if ($Root -match "vh") {
+            Run-Command-Stop-On-Error "docker-compose -p vh down -v"
+        }
+        else {
+            Run-Command-Stop-On-Error "docker-compose down -v"
+        }
     }
 
     if ($instructions.InitDocker) {
         Run-Command-Stop-On-Error "docker-compose pull"
-        Run-Command-Stop-On-Error "docker-compose up -d"
+
+        if ($Root -match "vh") {
+            Run-Command-Stop-On-Error "docker-compose -p vh up -d"
+        }
+        else {
+            Run-Command-Stop-On-Error "docker-compose up -d"
+        }
     }
 
     if ($instructions.ValidateServerVersion) {
-        Validate-Server-Version `
-            -ImplementationDir $Root
+        Validate-Server-Version -ImplementationDir $Root
     }
 
     if ($instructions.StartDocker) {
@@ -277,16 +335,29 @@ try {
         Run-Command-Stop-On-Error "docker restart signal-es-1"
     }
     
+    if ($instructions.InstallNode) {
+        $node = Get-Node-Info
+
+        if (!$node) {
+            if ($Root -match "vh") {
+                Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v12.22.12-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v12.22.12-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
+            }
+            else {
+                Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v18.20.2-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
+            }
+        }
+    }
+
     if ($instructions.InstallNodeModules) {
         do {
             $runAgain = $false
             $command = ""
 
-            if ($Root -match "signal") {
-                $command = "yarn install"
-            }
-            elseif ($Root -match "dva") {
+            if ($Root -match "dva") {
                 $command = "yarn install-modules"
+            }
+            else {
+                $command = "yarn install"
             }
 
             Run-Command $command 2>&1 | Tee-Object -Variable commandOutput
@@ -307,11 +378,14 @@ try {
     }
 
     $publishEnv = $null
-    if ($Root -match "signal") {
-        $publishEnv = "local"
-    }
-    elseif ($Root -match "dva") {
+    if ($Root -match "dva") {
         $publishEnv = "docker"
+    }
+    elseif ($Root -match "vh") {
+        $publishEnv = "demo-vh"
+    }
+    else {
+        $publishEnv = "local"
     }
 
     if ($instructions.ValidateWorkspace) {
@@ -336,12 +410,18 @@ try {
         elseif ($Root -match "dva") {
             $serverName = "dva-server-1"
         }
+        elseif ($Root -match "vh") {
+            $serverName = "vh-server-1"
+        }
+        else {
+            Write-Error "Don't know how to restart server :(" -ErrorAction Stop
+        }
 
         Run-Command-Stop-On-Error "docker restart $serverName"
     }
 
     if ($instructions.InstallStudio) {
-        Run-Command-Stop-On-Error "ops download:studio -v $(cat PLATFORM_VERSION) -i"
+        Run-Command-Stop-On-Error "ops download:studio -v $(Get-AdInsure-Server-Version) -i"
     }
 
     if ($instructions.RegisterScheduler) {
