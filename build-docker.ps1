@@ -97,6 +97,21 @@ function Validate-Implementation-Master-Branch {
 function Get-AdInsure-Server-Version {
     param(
     )
+
+    if ($ImplementationDir -match "signal") {
+        $serverName = "signal-server-1"
+    }
+    elseif ($ImplementationDir -match "dva") {
+        $serverName = "dva-server-1"
+    }
+    elseif ($ImplementationDir -match "VHDemoCommercial") {
+        $serverName = "commercial-server-1"
+    }
+
+    docker cp ${serverName}:/app/Adacta.AdInsure.Core.API.dll "$([System.IO.Path]::GetTempPath())" | Out-Null
+    if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
+        Write-Error "FAILED ($LASTEXITCODE)! Unable to copy Adinusre dll from docker container to temp" -ErrorAction Stop
+    }
     
     $serverVersion = (Get-Item "$([System.IO.Path]::GetTempPath())/Adacta.AdInsure.Core.API.dll").VersionInfo.FileVersion
     if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
@@ -121,18 +136,6 @@ function Validate-Server-Version {
     
         if (!(Test-Path "PLATFORM_VERSION")) {
             return
-        }
-
-        if ($ImplementationDir -match "signal") {
-            $serverName = "signal-server-1"
-        }
-        elseif ($ImplementationDir -match "dva") {
-            $serverName = "dva-server-1"
-        }
-
-        docker cp ${serverName}:/app/Adacta.AdInsure.Core.API.dll "$([System.IO.Path]::GetTempPath())" | Out-Null
-        if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
-            Write-Error "FAILED ($LASTEXITCODE)! Unable to copy Adinusre dll from docker container to temp" -ErrorAction Stop
         }
 
         $serverVersion = Get-AdInsure-Server-Version
@@ -190,12 +193,12 @@ if ($CleanPublish) {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopPreviousDocker = $true
     $instructions.Clean = $true
-    $instructions.UninstallNode = $true
+    # $instructions.UninstallNode = $true
     $instructions.RemoveDocker = $true
     $instructions.InitDocker = $true
     $instructions.ValidateServerVersion = $true
     $instructions.InstallESAnalysisIcuPlugin = $true
-    $instructions.InstallNode = $true
+    # $instructions.InstallNode = $true
     $instructions.InstallNodeModules = $true
     $instructions.ExecutePrePublishScripts = $true
     $instructions.ValidateWorkspace = $true
@@ -285,41 +288,30 @@ try {
         }
     }
 
-    if ($instructions.UninstallNode) {
-        $node = Get-Node-Info
-        $uninstall = $true
+    # if ($instructions.UninstallNode) {
+    #     $node = Get-Node-Info
+    #     $uninstall = $true
 
-        if (($Root -match "vh") -and ($node.DisplayVersion -eq "12.22.12")) {
-            $uninstall = $false
-        }
-        elseif ($node.DisplayVersion -eq "18.20.2") {
-            $uninstall = $false
-        }
+    #     if (($Root -match "vh") -and ($node.DisplayVersion -eq "12.22.12")) {
+    #         $uninstall = $false
+    #     }
+    #     elseif ($node.DisplayVersion -eq "18.20.2") {
+    #         $uninstall = $false
+    #     }
 
-        if ($node -and $uninstall) {
-            Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v18.20.2-x64.log`" | Out-Default"            
-            Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v12.22.12-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v12.22.12-x64.log`" | Out-Default"
-        }
-    }
+    #     if ($node -and $uninstall) {
+    #         Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v18.20.2-x64.log`" | Out-Default"            
+    #         Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v12.22.12-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v12.22.12-x64.log`" | Out-Default"
+    #     }
+    # }
 
     if ($instructions.RemoveDocker) {
-        if ($Root -match "vh") {
-            Run-Command-Stop-On-Error "docker-compose -p vh down -v"
-        }
-        else {
-            Run-Command-Stop-On-Error "docker-compose down -v"
-        }
+        Run-Command-Stop-On-Error "docker-compose down -v"
     }
 
     if ($instructions.InitDocker) {
         Run-Command-Stop-On-Error "docker-compose pull"
-
-        if ($Root -match "vh") {
-            Run-Command-Stop-On-Error "docker-compose -p vh up -d"
-        }
-        else {
-            Run-Command-Stop-On-Error "docker-compose up -d"
-        }
+        Run-Command-Stop-On-Error "docker-compose up -d"
     }
 
     if ($instructions.ValidateServerVersion) {
@@ -335,18 +327,18 @@ try {
         Run-Command-Stop-On-Error "docker restart signal-es-1"
     }
     
-    if ($instructions.InstallNode) {
-        $node = Get-Node-Info
+    # if ($instructions.InstallNode) {
+    #     $node = Get-Node-Info
 
-        if (!$node) {
-            if ($Root -match "vh") {
-                Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v12.22.12-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v12.22.12-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
-            }
-            else {
-                Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v18.20.2-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
-            }
-        }
-    }
+    #     if (!$node) {
+    #         if ($Root -match "vh") {
+    #             Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v12.22.12-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v12.22.12-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
+    #         }
+    #         else {
+    #             Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v18.20.2-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
+    #         }
+    #     }
+    # }
 
     if ($instructions.InstallNodeModules) {
         do {
@@ -362,7 +354,7 @@ try {
 
             Run-Command $command 2>&1 | Tee-Object -Variable commandOutput
             
-            if (($commandOutput -match "401 Unauthorized") -or ($commandOutput -match "error couldn't find package") -or ($commandOutput -match "503 Service Unavailable")) {
+            if (($commandOutput -match "401 Unauthorized") -or ($commandOutput -match "503 Service Unavailable")) {
                 $runAgain = $true
             }
             elseif (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
@@ -381,9 +373,9 @@ try {
     if ($Root -match "dva") {
         $publishEnv = "docker"
     }
-    elseif ($Root -match "vh") {
-        $publishEnv = "demo-vh"
-    }
+    # elseif ($Root -match "VHDemoCommercial") {
+    #     $publishEnv = "basic-local"
+    # }
     else {
         $publishEnv = "local"
     }
@@ -410,8 +402,8 @@ try {
         elseif ($Root -match "dva") {
             $serverName = "dva-server-1"
         }
-        elseif ($Root -match "vh") {
-            $serverName = "vh-server-1"
+        elseif ($Root -match "VHDemoCommercial") {
+            $serverName = "commercial-server-1"
         }
         else {
             Write-Error "Don't know how to restart server :(" -ErrorAction Stop
