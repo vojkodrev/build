@@ -16,7 +16,9 @@ param(
     
     [switch]$GitRebase = $false,
 
-    [switch]$InstallNodeModules = $false
+    [switch]$InstallNodeModules = $false,
+
+    [switch]$ImportData = $false
 )
 
 function Run-Command {
@@ -96,19 +98,21 @@ function Validate-Implementation-Master-Branch {
 
 function Get-AdInsure-Server-Version {
     param(
+        [parameter(Mandatory = $true)]
+        [string]$ServerName
     )
 
-    if ($ImplementationDir -match "signal") {
-        $serverName = "signal-server-1"
-    }
-    elseif ($ImplementationDir -match "dva") {
-        $serverName = "dva-server-1"
-    }
-    elseif ($ImplementationDir -match "VHDemoCommercial") {
-        $serverName = "commercial-server-1"
-    }
+    # if ($ImplementationDir -match "signal") {
+    #     $serverName = "signal-server-1"
+    # }
+    # elseif ($ImplementationDir -match "dva") {
+    #     $serverName = "dva-server-1"
+    # }
+    # elseif ($ImplementationDir -match "VHDemoCommercial") {
+    #     $serverName = "commercial-server-1"
+    # }
 
-    docker cp ${serverName}:/app/Adacta.AdInsure.Core.API.dll "$([System.IO.Path]::GetTempPath())" | Out-Null
+    docker cp ${ServerName}:/app/Adacta.AdInsure.Core.API.dll "$([System.IO.Path]::GetTempPath())" | Out-Null
     if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
         Write-Error "FAILED ($LASTEXITCODE)! Unable to copy Adinusre dll from docker container to temp" -ErrorAction Stop
     }
@@ -126,7 +130,10 @@ function Get-AdInsure-Server-Version {
 function Validate-Server-Version {
     param(
         [parameter(Mandatory = $true)]
-        [string]$ImplementationDir
+        [string]$ImplementationDir,
+        
+        [parameter(Mandatory = $true)]
+        [string]$ServerName
     )
   
     $startingLocation = Get-Location
@@ -138,7 +145,7 @@ function Validate-Server-Version {
             return
         }
 
-        $serverVersion = Get-AdInsure-Server-Version
+        $serverVersion = Get-AdInsure-Server-Version $ServerName
         
         $implPlatformVersion = cat PLATFORM_VERSION
 
@@ -179,6 +186,7 @@ $instructions = @{
     PublishWorkspace                   = $false
     ExecutePostPublishScripts          = $false
     RestartServer                      = $false
+    ImportData                         = $false
     InstallStudio                      = $false
     RegisterScheduler                  = $false
 }
@@ -205,6 +213,7 @@ if ($CleanPublish) {
     $instructions.PublishWorkspace = $true
     $instructions.ExecutePostPublishScripts = $true
     $instructions.RestartServer = $true
+    $instructions.ImportData = $true
     $instructions.InstallStudio = $true
     # $instructions.RegisterScheduler = $true
 }
@@ -235,9 +244,11 @@ if ($Publish) {
 }
 
 if ($InstallNodeModules) {
-    $instructions.ValidateImplementationMasterBranch = $true
-    $instructions.ValidateServerVersion = $true
     $instructions.InstallNodeModules = $true
+}
+
+if ($ImportData) {
+    $instructions.ImportData = $true
 }
 
 if ($DontValidateImplementationMasterBranch) {
@@ -305,21 +316,46 @@ try {
     #     }
     # }
 
+    $serverName = $null
+    if ($Root -match "signal") {
+        $serverName = "signal-server-1"
+    }
+    elseif ($Root -match "dva") {
+        $serverName = "dva-server-1"
+    }
+    elseif ($Root -match "VHDemoCommercial") {
+        $serverName = "commercial-server-1"
+    }
+    elseif ($Root -match "Triglav") {
+        $serverName = "triglav-server-1"
+    }
+    else {
+        Write-Error "Unknown server name" -ErrorAction Stop
+    }
+
+    $dockerComposeFile = $null
+    if ($Root -match "Triglav") {
+        $dockerComposeFile = "docker-compose-si.yml"
+    }
+    else {
+        $dockerComposeFile = "docker-compose.yml"
+    }
+
     if ($instructions.RemoveDocker) {
-        Run-Command-Stop-On-Error "docker-compose down -v"
+        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile down -v"
     }
 
     if ($instructions.InitDocker) {
-        Run-Command-Stop-On-Error "docker-compose pull"
-        Run-Command-Stop-On-Error "docker-compose up -d"
+        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile pull"
+        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile up -d"
     }
 
     if ($instructions.ValidateServerVersion) {
-        Validate-Server-Version -ImplementationDir $Root
+        Validate-Server-Version -ImplementationDir $Root -ServerName $serverName
     }
 
     if ($instructions.StartDocker) {
-        Run-Command-Stop-On-Error "docker-compose start"
+        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile start"
     }
 
     if (($instructions.InstallESAnalysisIcuPlugin) -and ($Root -match "signal")) {
@@ -354,7 +390,7 @@ try {
 
             Run-Command $command 2>&1 | Tee-Object -Variable commandOutput
             
-            if (($commandOutput -match "401 Unauthorized") -or ($commandOutput -match "503 Service Unavailable")) {
+            if (($commandOutput -match "401 Unauthorized") -or ($commandOutput -match "503 Service Unavailable") -or ($commandOutput -match "Couldn't find package")) {
                 $runAgain = $true
             }
             elseif (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
@@ -376,6 +412,9 @@ try {
     # elseif ($Root -match "VHDemoCommercial") {
     #     $publishEnv = "basic-local"
     # }
+    elseif ($Root -match "Triglav") {
+        $publishEnv = "local.si"
+    }
     else {
         $publishEnv = "local"
     }
@@ -395,25 +434,28 @@ try {
     }
     
     if ($instructions.RestartServer) {
-        $serverName = $null
-        if ($Root -match "signal") {
-            $serverName = "signal-server-1"
-        }
-        elseif ($Root -match "dva") {
-            $serverName = "dva-server-1"
-        }
-        elseif ($Root -match "VHDemoCommercial") {
-            $serverName = "commercial-server-1"
-        }
-        else {
-            Write-Error "Don't know how to restart server :(" -ErrorAction Stop
-        }
-
         Run-Command-Stop-On-Error "docker restart $serverName"
     }
 
+    if ($instructions.ImportData) {
+        if ($Root -match "Triglav") {
+            do {
+                $runAgain = $false
+                Start-Sleep 10s
+                Run-Command "yarn run import-gurs -e local.si" 2>&1 | Tee-Object -Variable commandOutput
+                
+                if ($commandOutput -match "socket hang up") {
+                    $runAgain = $true
+                }
+                elseif ($LASTEXITCODE) {
+                    Write-Error "FAILED ($LASTEXITCODE)!" -ErrorAction Stop
+                }
+            } while ($runAgain)
+        }
+    }
+
     if ($instructions.InstallStudio) {
-        Run-Command-Stop-On-Error "ops download:studio -v $(Get-AdInsure-Server-Version) -i"
+        Run-Command-Stop-On-Error "ops download:studio -v $(Get-AdInsure-Server-Version $serverName) -i"
     }
 
     if ($instructions.RegisterScheduler) {
