@@ -13,6 +13,7 @@ param(
 
     [switch]$DontValidateImplementationMasterBranch = $false,
     [switch]$DontValidateServerVersion = $false,
+    [switch]$DontRestartServer = $false,
     
     [switch]$GitRebase = $false,
 
@@ -178,7 +179,7 @@ $instructions = @{
     InitDocker                         = $false
     ValidateServerVersion              = $false
     StartDocker                        = $false
-    InstallESAnalysisIcuPlugin         = $false
+    # InstallESAnalysisIcuPlugin         = $false
     InstallNode                        = $false
     InstallNodeModules                 = $false
     ExecutePrePublishScripts           = $false
@@ -201,12 +202,12 @@ if ($CleanPublish) {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopPreviousDocker = $true
     $instructions.Clean = $true
-    # $instructions.UninstallNode = $true
+    $instructions.UninstallNode = $true
     $instructions.RemoveDocker = $true
     $instructions.InitDocker = $true
     $instructions.ValidateServerVersion = $true
-    $instructions.InstallESAnalysisIcuPlugin = $true
-    # $instructions.InstallNode = $true
+    # $instructions.InstallESAnalysisIcuPlugin = $true
+    $instructions.InstallNode = $true
     $instructions.InstallNodeModules = $true
     $instructions.ExecutePrePublishScripts = $true
     $instructions.ValidateWorkspace = $true
@@ -259,6 +260,10 @@ if ($DontValidateServerVersion) {
     $instructions.ValidateServerVersion = $false
 }
 
+if ($DontRestartServer) {
+    $instructions.RestartServer = $false
+}
+
 if ($instructions.ValidateImplementationMasterBranch) {
     Validate-Implementation-Master-Branch `
         -ImplementationDir $Root `
@@ -266,12 +271,44 @@ if ($instructions.ValidateImplementationMasterBranch) {
         -GitRebase:$instructions.GitRebase
 }
 
+$dockerComposeFile = $null
+if (($Root -match "Triglav") -and !($Root -match "TriglavCore")) {
+    $dockerComposeFile = "docker-compose-si.yml"
+}
+else {
+    $dockerComposeFile = "docker-compose.yml"
+}
+
+$dockerComposeProject = $null
+if ($Root -match "TriglavCore") {
+    $dockerComposeProject = "-p triglav_core"
+}
+else {
+    $dockerComposeProject = ""
+}
+
+$dockerComposeFilePrevious = $null
+if (($PreviousRoot -match "Triglav") -and !($PreviousRoot -match "TriglavCore")) {
+    $dockerComposeFilePrevious = "docker-compose-si.yml"
+}
+else {
+    $dockerComposeFilePrevious = "docker-compose.yml"
+}
+
+$dockerComposeProjectPrevious = $null
+if ($PreviousRoot -match "TriglavCore") {
+    $dockerComposeProjectPrevious = "-p triglav_core"
+}
+else {
+    $dockerComposeProjectPrevious = ""
+}
+
 if ($PreviousRoot) {
     $startingLocation = Get-Location
     try {
         Set-Location $PreviousRoot
         if ($instructions.StopPreviousDocker) {
-            Run-Command-Stop-On-Error "docker-compose stop"
+            Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFilePrevious $dockerComposeProjectPrevious stop"
         }
     }
     finally {
@@ -297,24 +334,37 @@ try {
         if (!(Test-Path $printoutAssetsDir)) {
             Run-Command-Stop-On-Error "New-Item -Path $printoutAssetsDir -ItemType Directory"
         }
+
+        Run-Command-Stop-On-Error "Remove-Item -Recurse -Force web-test-framework"
     }
 
-    # if ($instructions.UninstallNode) {
-    #     $node = Get-Node-Info
-    #     $uninstall = $true
+    if ($instructions.UninstallNode) {
+        $node = Get-Node-Info
+        $uninstall = $true
 
-    #     if (($Root -match "vh") -and ($node.DisplayVersion -eq "12.22.12")) {
-    #         $uninstall = $false
-    #     }
-    #     elseif ($node.DisplayVersion -eq "18.20.2") {
-    #         $uninstall = $false
-    #     }
+        if ($Root -match "TriglavCore") {
+            if ($node.DisplayVersion -eq "16.20.2") {
+                $uninstall = $false;
+            }
+        }
+        else {
+            if ($node.DisplayVersion -eq "18.20.2") {
+                $uninstall = $false
+            }
+        }
 
-    #     if ($node -and $uninstall) {
-    #         Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v18.20.2-x64.log`" | Out-Default"            
-    #         Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v12.22.12-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v12.22.12-x64.log`" | Out-Default"
-    #     }
-    # }
+        # if (($Root -match "TriglavCore") -and ($node.DisplayVersion -eq "16.20.2")) {
+        #     $uninstall = $false
+        # }
+        # elseif ($node.DisplayVersion -eq "18.20.2") {
+        #     $uninstall = $false
+        # }
+
+        if ($node -and $uninstall) {
+            Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v18.20.2-x64.log`" | Out-Default"            
+            Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v16.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v16.20.2-x64.log`" | Out-Default"
+        }
+    }
 
     $serverName = $null
     if ($Root -match "signal") {
@@ -326,6 +376,9 @@ try {
     elseif ($Root -match "VHDemoCommercial") {
         $serverName = "commercial-server-1"
     }
+    elseif ($Root -match "TriglavCore") {
+        $serverName = "triglav_core-server-1"
+    }
     elseif ($Root -match "Triglav") {
         $serverName = "triglav-server-1"
     }
@@ -333,21 +386,13 @@ try {
         Write-Error "Unknown server name" -ErrorAction Stop
     }
 
-    $dockerComposeFile = $null
-    if ($Root -match "Triglav") {
-        $dockerComposeFile = "docker-compose-si.yml"
-    }
-    else {
-        $dockerComposeFile = "docker-compose.yml"
-    }
-
     if ($instructions.RemoveDocker) {
-        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile down -v"
+        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject down -v"
     }
 
     if ($instructions.InitDocker) {
-        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile pull"
-        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile up -d"
+        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject pull"
+        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject up -d"
     }
 
     if ($instructions.ValidateServerVersion) {
@@ -355,26 +400,26 @@ try {
     }
 
     if ($instructions.StartDocker) {
-        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile start"
+        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject start"
     }
 
-    if (($instructions.InstallESAnalysisIcuPlugin) -and ($Root -match "signal")) {
-        Run-Command-Stop-On-Error "docker exec -it signal-es-1 bin/elasticsearch-plugin install analysis-icu"
-        Run-Command-Stop-On-Error "docker restart signal-es-1"
-    }
-    
-    # if ($instructions.InstallNode) {
-    #     $node = Get-Node-Info
-
-    #     if (!$node) {
-    #         if ($Root -match "vh") {
-    #             Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v12.22.12-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v12.22.12-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
-    #         }
-    #         else {
-    #             Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v18.20.2-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
-    #         }
-    #     }
+    # if (($instructions.InstallESAnalysisIcuPlugin) -and ($Root -match "signal")) {
+    #     Run-Command-Stop-On-Error "docker exec -it signal-es-1 bin/elasticsearch-plugin install analysis-icu"
+    #     Run-Command-Stop-On-Error "docker restart signal-es-1"
     # }
+    
+    if ($instructions.InstallNode) {
+        $node = Get-Node-Info
+
+        if (!$node) {
+            if ($Root -match "TriglavCore") {
+                Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v16.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v16.20.2-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
+            }
+            else {
+                Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v18.20.2-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
+            }
+        }
+    }
 
     if ($instructions.InstallNodeModules) {
         do {
@@ -390,7 +435,11 @@ try {
 
             Run-Command $command 2>&1 | Tee-Object -Variable commandOutput
             
-            if (($commandOutput -match "401 Unauthorized") -or ($commandOutput -match "503 Service Unavailable") -or ($commandOutput -match "Couldn't find package")) {
+            if (($commandOutput -match "401 Unauthorized") -or `
+                ($commandOutput -match "503 Service Unavailable") -or `
+                ($commandOutput -match "500 Internal Server Error") -or `
+                ($commandOutput -match "Couldn't find package") `
+            ) {
                 $runAgain = $true
             }
             elseif (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne $null)) {
@@ -409,10 +458,7 @@ try {
     if ($Root -match "dva") {
         $publishEnv = "docker"
     }
-    # elseif ($Root -match "VHDemoCommercial") {
-    #     $publishEnv = "basic-local"
-    # }
-    elseif ($Root -match "Triglav") {
+    elseif (($Root -match "Triglav") -and !($Root -match "TriglavCore")) {
         $publishEnv = "local.si"
     }
     else {
@@ -424,7 +470,22 @@ try {
     }
     
     if ($instructions.PublishWorkspace) {
-        Run-Command-Stop-On-Error "yarn run publish-workspace -e $publishEnv"
+
+        Run-Command-Stop-On-Error "yarn run publish-workspace -e $publishEnv" 2>&1 | Tee-Object -Variable commandOutput
+
+        $runAgain = $false
+        do {
+            $runAgain = $false
+            
+            # if (($commandOutput -match "was deadlocked on lock resources with another process") -or `
+            #     ($commandOutput -match "BusinessException.*?skupina s kodo OTP ne obstaja")
+            if ($commandOutput -match "Token exchange failed with the following error: TimeoutError: Timeout awaiting 'request'") {
+                $runAgain = $true
+            }
+            elseif ($LASTEXITCODE) {
+                Write-Error "FAILED ($LASTEXITCODE)!" -ErrorAction Stop
+            }
+        } while ($runAgain)
     }
 
     if ($instructions.ExecutePostPublishScripts) {
@@ -438,19 +499,30 @@ try {
     }
 
     if ($instructions.ImportData) {
-        if ($Root -match "Triglav") {
+        if (($Root -match "Triglav") -and !($Root -match "TriglavCore")) {
+            $count = 1;
             do {
                 $runAgain = $false
-                Start-Sleep 10s
+                Start-Sleep 15s
                 Run-Command "yarn run import-gurs -e local.si" 2>&1 | Tee-Object -Variable commandOutput
                 
-                if ($commandOutput -match "socket hang up") {
+                if (($commandOutput -match "socket hang up") -or `
+                    ($commandOutput -match "Request failed with status code") `
+                ) {
                     $runAgain = $true
                 }
                 elseif ($LASTEXITCODE) {
                     Write-Error "FAILED ($LASTEXITCODE)!" -ErrorAction Stop
                 }
+
+                if ($count -gt 3) {
+                    break;
+                }
+                $count++
+                
             } while ($runAgain)
+
+            Run-Command "yarn run import-test-data -e local.si"
         }
     }
 
