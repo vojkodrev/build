@@ -7,6 +7,7 @@ param(
     [switch]$SwitchEnv = $false,
     
     [switch]$CleanPublish = $false,
+    [switch]$CleanNodeModules = $false,
 
     [switch]$Publish = $false,
     [switch]$ValidatePublish = $false,
@@ -14,12 +15,17 @@ param(
     [switch]$DontValidateImplementationMasterBranch = $false,
     [switch]$DontValidateServerVersion = $false,
     [switch]$DontRestartServer = $false,
+    [switch]$DontRemoveVolumes = $false,
     
     [switch]$GitRebase = $false,
 
     [switch]$InstallNodeModules = $false,
 
-    [switch]$ImportData = $false
+    [switch]$InstallStudio = $false,
+
+    [switch]$ImportData = $false,
+
+    [switch]$RestartDocker = $false
 )
 
 function Run-Command {
@@ -174,11 +180,14 @@ $instructions = @{
     StopPreviousDocker                 = $false
     GitRebase                          = $false
     Clean                              = $false
+    CleanNodeModules                   = $false
     UninstallNode                      = $false
+    StopDocker                         = $false
     RemoveDocker                       = $false
     InitDocker                         = $false
     ValidateServerVersion              = $false
     StartDocker                        = $false
+    ValidateCorrectDocker              = $false
     # InstallESAnalysisIcuPlugin         = $false
     InstallNode                        = $false
     InstallNodeModules                 = $false
@@ -206,6 +215,7 @@ if ($CleanPublish) {
     $instructions.RemoveDocker = $true
     $instructions.InitDocker = $true
     $instructions.ValidateServerVersion = $true
+    $instructions.ValidateCorrectDocker = $true
     # $instructions.InstallESAnalysisIcuPlugin = $true
     $instructions.InstallNode = $true
     $instructions.InstallNodeModules = $true
@@ -219,6 +229,18 @@ if ($CleanPublish) {
     # $instructions.RegisterScheduler = $true
 }
 
+if ($CleanNodeModules) {
+    $instructions.CleanNodeModules = $true;
+}
+
+if ($RestartDocker) {
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.ValidateServerVersion = $true
+    $instructions.ValidateCorrectDocker = $true
+    $instructions.StopDocker = $true
+    $instructions.StartDocker = $true
+}
+
 if ($SwitchEnv) {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.StopPreviousDocker = $true
@@ -226,6 +248,7 @@ if ($SwitchEnv) {
     $instructions.InstallNode = $true
     $instructions.ValidateServerVersion = $true
     $instructions.StartDocker = $true
+    $instructions.ValidateCorrectDocker = $true
     $instructions.InstallStudio = $true
 }
 
@@ -233,6 +256,7 @@ if ($ValidatePublish) {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.ValidateServerVersion = $true
     $instructions.ValidateWorkspace = $true
+    $instructions.ValidateCorrectDocker = $true
     $instructions.PublishWorkspace = $true
     $instructions.RestartServer = $true
 }
@@ -240,12 +264,20 @@ if ($ValidatePublish) {
 if ($Publish) {
     $instructions.ValidateImplementationMasterBranch = $true
     $instructions.ValidateServerVersion = $true
+    $instructions.ValidateCorrectDocker = $true
     $instructions.PublishWorkspace = $true
     $instructions.RestartServer = $true
 }
 
 if ($InstallNodeModules) {
     $instructions.InstallNodeModules = $true
+}
+
+if ($InstallStudio) {
+    $instructions.ValidateImplementationMasterBranch = $true
+    $instructions.ValidateServerVersion = $true
+    $instructions.ValidateCorrectDocker = $true
+    $instructions.InstallStudio = $true
 }
 
 if ($ImportData) {
@@ -323,7 +355,13 @@ try {
     if ($instructions.Clean) {
         Run-Command-Stop-On-Error "git stash --include-untracked" | Tee-Object -Variable gitStashOutput
         
-        Run-Command-Stop-On-Error "echo no | git clean -fdx -e node_modules"
+        if ($instructions.CleanNodeModules) {
+            Run-Command-Stop-On-Error "echo no | git clean -fdx"
+        }
+        else {
+            Run-Command-Stop-On-Error "echo no | git clean -fdx -e node_modules"
+        }
+        
         Run-Command-Stop-On-Error "git reset --hard"
         
         if (!($gitStashOutput -match "No local changes to save")) {
@@ -338,33 +376,33 @@ try {
         Run-Command-Stop-On-Error "Remove-Item -Recurse -Force web-test-framework"
     }
 
-    if ($instructions.UninstallNode) {
-        $node = Get-Node-Info
-        $uninstall = $true
+    # if ($instructions.UninstallNode) {
+    #     $node = Get-Node-Info
+    #     $uninstall = $true
 
-        if ($Root -match "TriglavCore") {
-            if ($node.DisplayVersion -eq "16.20.2") {
-                $uninstall = $false;
-            }
-        }
-        else {
-            if ($node.DisplayVersion -eq "18.20.2") {
-                $uninstall = $false
-            }
-        }
+    #     if ($Root -match "TriglavCore") {
+    #         if ($node.DisplayVersion -eq "16.20.2") {
+    #             $uninstall = $false;
+    #         }
+    #     }
+    #     else {
+    #         if ($node.DisplayVersion -eq "18.20.2") {
+    #             $uninstall = $false
+    #         }
+    #     }
 
-        # if (($Root -match "TriglavCore") -and ($node.DisplayVersion -eq "16.20.2")) {
-        #     $uninstall = $false
-        # }
-        # elseif ($node.DisplayVersion -eq "18.20.2") {
-        #     $uninstall = $false
-        # }
+    #     # if (($Root -match "TriglavCore") -and ($node.DisplayVersion -eq "16.20.2")) {
+    #     #     $uninstall = $false
+    #     # }
+    #     # elseif ($node.DisplayVersion -eq "18.20.2") {
+    #     #     $uninstall = $false
+    #     # }
 
-        if ($node -and $uninstall) {
-            Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v18.20.2-x64.log`" | Out-Default"            
-            Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v16.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v16.20.2-x64.log`" | Out-Default"
-        }
-    }
+    #     if ($node -and $uninstall) {
+    #         Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v18.20.2-x64.log`" | Out-Default"            
+    #         Run-Command "msiexec /x `"C:\Users\VojkoD.ADFT\Downloads\node-v16.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-uninstall-v16.20.2-x64.log`" | Out-Default"
+    #     }
+    # }
 
     $serverName = $null
     if ($Root -match "signal") {
@@ -382,12 +420,24 @@ try {
     elseif ($Root -match "Triglav") {
         $serverName = "triglav-server-1"
     }
+    elseif ($Root -match "CID") {
+        $serverName = "cid-server-1"
+    }
     else {
         Write-Error "Unknown server name" -ErrorAction Stop
     }
 
+    if ($instructions.StopDocker) {
+        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject stop"
+    }
+
     if ($instructions.RemoveDocker) {
-        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject down -v"
+        if ($DontRemoveVolumes) {
+            Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject down"
+        }
+        else {
+            Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject down -v"
+        }
     }
 
     if ($instructions.InitDocker) {
@@ -395,12 +445,18 @@ try {
         Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject up -d"
     }
 
+    if ($instructions.StartDocker) {
+        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject start"
+    }
+
     if ($instructions.ValidateServerVersion) {
         Validate-Server-Version -ImplementationDir $Root -ServerName $serverName
     }
 
-    if ($instructions.StartDocker) {
-        Run-Command-Stop-On-Error "docker-compose -f $dockerComposeFile $dockerComposeProject start"
+    if ($instructions.ValidateCorrectDocker) {
+        if (!(docker ps | Select-String $serverName)) {
+            Write-Error "Currently Docker containers for different environment are running. $serverName expected" -ErrorAction Stop
+        }
     }
 
     # if (($instructions.InstallESAnalysisIcuPlugin) -and ($Root -match "signal")) {
@@ -408,18 +464,18 @@ try {
     #     Run-Command-Stop-On-Error "docker restart signal-es-1"
     # }
     
-    if ($instructions.InstallNode) {
-        $node = Get-Node-Info
+    # if ($instructions.InstallNode) {
+    #     $node = Get-Node-Info
 
-        if (!$node) {
-            if ($Root -match "TriglavCore") {
-                Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v16.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v16.20.2-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
-            }
-            else {
-                Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v18.20.2-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
-            }
-        }
-    }
+    #     if (!$node) {
+    #         if ($Root -match "TriglavCore") {
+    #             Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v16.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v16.20.2-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
+    #         }
+    #         else {
+    #             Run-Command-Stop-On-Error "msiexec /i `"C:\Users\VojkoD.ADFT\Downloads\node-v18.20.2-x64.msi`" /quiet /log `"C:\Users\VojkoD.ADFT\Downloads\node-install-v18.20.2-x64.log`" NATIVETOOLSCHECKBOX=1 | Out-Default"
+    #         }
+    #     }
+    # }
 
     if ($instructions.InstallNodeModules) {
         do {
@@ -461,6 +517,9 @@ try {
     elseif (($Root -match "Triglav") -and !($Root -match "TriglavCore")) {
         $publishEnv = "local.si"
     }
+    elseif ($Root -match "CID") {
+        $publishEnv = "si"
+    }
     else {
         $publishEnv = "local"
     }
@@ -498,7 +557,7 @@ try {
         Run-Command-Stop-On-Error "docker restart $serverName"
     }
 
-    if ($instructions.ImportData) {
+    if ($instructions.ImportData -and !$DontRemoveVolumes) {
         if (($Root -match "Triglav") -and !($Root -match "TriglavCore")) {
             $count = 1;
             do {
@@ -521,8 +580,13 @@ try {
                 $count++
                 
             } while ($runAgain)
-
-            Run-Command "yarn run import-test-data -e local.si"
+        }
+        
+        if (($Root -match "Triglav") -and !($Root -match "TriglavCore")) {
+            Run-Command-Stop-On-Error "yarn run import-test-data -e local.si"
+        }
+        elseif ($Root -match "CID") {
+            Run-Command-Stop-On-Error "yarn import-test-data -e si"
         }
     }
 
